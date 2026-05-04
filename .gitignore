@@ -1,6 +1,6 @@
 # Python cache
-# __pycache__/  (Explicitly allowed)
-# *.py[cod]    (Explicitly allowed)
+__pycache__/
+*.py[cod]
 *$py.class
 *.so
 .Python
