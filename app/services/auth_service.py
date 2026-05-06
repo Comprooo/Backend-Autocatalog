@@ -1,4 +1,5 @@
-from app.schemas.user import UserCreate, UserLogin, TokenResponse
+from app.schemas.user import UserCreate, UserLogin, TokenResponse, UserUpdate, UserChangePassword
+from app.models.user import User
 from app.repositories.user_repo import user_repo
 from app.core.security import get_password_hash, verify_password, create_access_token
 from fastapi import HTTPException, status
@@ -40,8 +41,36 @@ class AuthService:
         if not user or not verify_password(login_data.password, user.hashed_password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
             
-        access_token = create_access_token(data={"sub": user.username})
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return TokenResponse(access_token=access_token, role=user.role)
+
+    async def update_profile(self, user: User, update_data: UserUpdate) -> User:
+        if update_data.username and update_data.username != user.username:
+            existing_user = await user_repo.get_by_username(update_data.username)
+            if existing_user:
+                raise HTTPException(status_code=400, detail="Username already taken")
+
+        if update_data.email and update_data.email != user.email:
+            existing_email = await user_repo.get_by_email(update_data.email)
+            if existing_email:
+                raise HTTPException(status_code=400, detail="Email already registered")
+        
+        updated_user = await user_repo.update(user, update_data)
+        return updated_user
+
+    async def change_password(self, user: User, password_data: UserChangePassword) -> bool:
+        if not verify_password(password_data.old_password, user.hashed_password):
+            raise HTTPException(status_code=400, detail="Incorrect old password")
+        
+        if password_data.new_password != password_data.confirm_password:
+            raise HTTPException(status_code=400, detail="New passwords do not match")
+            
+        if len(password_data.new_password) < 6:
+            raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+        hashed_password = get_password_hash(password_data.new_password)
+        await user_repo.update(user, {"hashed_password": hashed_password})
+        return True
 
 auth_service = AuthService()

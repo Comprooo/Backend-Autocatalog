@@ -33,3 +33,13 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str = "customer"
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = Field(None, pattern=r'^[0-9]+$', description="Phone number must contain only digits")
+
+class UserChangePassword(BaseModel):
+    old_password: str
+    new_password: str
+    confirm_password: str

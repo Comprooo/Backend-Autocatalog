@@ -15,14 +15,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
     )
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        username: str = payload.get("sub")
+        user_id: str = payload.get("sub")
         token_type: str = payload.get("type")
-        if username is None or token_type != "access":
+        if user_id is None or token_type != "access":
             raise credentials_exception
     except JWTError:
         raise credentials_exception
     
-    user = await User.find_one(User.username == username)
+    user = await User.get(user_id)
     if user is None:
         raise credentials_exception
     return user
