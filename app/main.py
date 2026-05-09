@@ -49,6 +49,9 @@ app.include_router(admin_stats.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 
+# Mount uploads directory to serve static files
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+
 @app.get("/health", tags=["health"])
 async def health_check():
     return {"status": "healthy"}
