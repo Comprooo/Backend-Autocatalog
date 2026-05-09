@@ -1,0 +1,17 @@
+[
+    {
+        "location_name": "Showroom Utama - Tangerang",
+        "address": "Jl. Raya Serpong No. 99, Tangerang Selatan, Banten 15310",
+        "map_link": "https://maps.google.com/?q=Showroom+Autocatalog+Tangerang"
+    },
+    {
+        "location_name": "Showroom Cabang - Jakarta Selatan",
+        "address": "Jl. TB Simatupang No. 10, Cilandak, Jakarta Selatan, DKI Jakarta 12430",
+        "map_link": "https://maps.google.com/?q=Showroom+Autocatalog+Jakarta+Selatan"
+    },
+    {
+        "location_name": "Showroom Cabang - Bekasi",
+        "address": "Jl. Ahmad Yani No. 55, Bekasi Timur, Kota Bekasi, Jawa Barat 17111",
+        "map_link": "https://maps.google.com/?q=Showroom+Autocatalog+Bekasi"
+    }
+]

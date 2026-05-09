@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
-from typing import List, Any, Optional
+from typing import List, Any, Optional, Dict
 from app.schemas.common import ResponseModel
 from app.ai.chat import ai_chat_service
 from app.core.config import settings
@@ -17,7 +17,7 @@ class ChatRequest(BaseModel):
 
 class ChatData(BaseModel):
     reply: str
-    car_recommendations: List[Any]
+    car_recommendations: List[Dict[str, Any]] = []
 
 @chat_router.post("/chat", response_model=ResponseModel[ChatData])
 async def chat(request: ChatRequest, current_user: User = Depends(get_current_user)):

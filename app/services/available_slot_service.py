@@ -27,15 +27,19 @@ class AvailableSlotService:
         from datetime import datetime, timezone
         today = datetime.now(timezone.utc).date()
         
-        # Filter dasar: masih ada quota dan tanggal hari ini atau mendatang
-        query = (AvailableSlot.booked_count < AvailableSlot.quota) & (AvailableSlot.date >= today)
+        # Masukkan filter ke dalam list
+        filters = [
+            AvailableSlot.booked_count < AvailableSlot.quota,
+            AvailableSlot.date >= today
+        ]
         
         if location_id:
-            query = query & (AvailableSlot.location_id == PydanticObjectId(location_id))
+            filters.append(AvailableSlot.location_id == PydanticObjectId(location_id))
         if slot_date:
-            query = query & (AvailableSlot.date == slot_date)
+            filters.append(AvailableSlot.date == slot_date)
         
-        slots = await AvailableSlot.find(query).sort(+AvailableSlot.date, +AvailableSlot.time_start).to_list()
+        # Jalankan query dengan membongkar list filters (*filters)
+        slots = await AvailableSlot.find(*filters).sort(+AvailableSlot.date, +AvailableSlot.time_start).to_list()
         
         # Load locations for response
         location_ids = list(set([s.location_id for s in slots]))

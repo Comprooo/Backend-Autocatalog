@@ -15,6 +15,20 @@ services:
     volumes:
       - ./uploads:/app/uploads
 
+  seed:
+    build: .
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=car_db
+      - JWT_SECRET_KEY=supersecretkey-change-this-in-production
+      - INTERNAL_SERVICE_TOKEN=internal-ai-secret-token
+      - CLOUDINARY_CLOUD_NAME=dummy
+      - CLOUDINARY_API_KEY=dummy
+      - CLOUDINARY_API_SECRET=dummy
+    command: python seed/seed_db.py
+    depends_on:
+      - mongodb
+
   mongodb:
     image: mongo:6.0
     ports:
@@ -22,5 +36,14 @@ services:
     volumes:
       - mongodb_data:/data/db
 
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
 volumes:
   mongodb_data:
+  ollama_data:

@@ -1,0 +1,51 @@
+[
+    {
+        "username": "rafiq",
+        "email": "rafiq@autocatalog.id",
+        "phone": "081234567801",
+        "password": "password123",
+        "role": "admin"
+    },
+    {
+        "username": "maming",
+        "email": "maming@autocatalog.id",
+        "phone": "081234567802",
+        "password": "password123",
+        "role": "admin"
+    },
+    {
+        "username": "arsyad",
+        "email": "arsyad@autocatalog.id",
+        "phone": "081234567803",
+        "password": "password123",
+        "role": "customer"
+    },
+    {
+        "username": "ale",
+        "email": "ale@autocatalog.id",
+        "phone": "081234567804",
+        "password": "password123",
+        "role": "customer"
+    },
+    {
+        "username": "alfaris",
+        "email": "alfaris@autocatalog.id",
+        "phone": "081234567805",
+        "password": "password123",
+        "role": "customer"
+    },
+    {
+        "username": "veli",
+        "email": "veli@autocatalog.id",
+        "phone": "081234567806",
+        "password": "password123",
+        "role": "customer"
+    },
+    {
+        "username": "nabilaputri",
+        "email": "nabilaputri@autocatalog.id",
+        "phone": "081234567807",
+        "password": "password123",
+        "role": "customer"
+    }
+]
