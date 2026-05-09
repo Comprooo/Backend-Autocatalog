@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Query, Path
 from typing import List, Optional
-from app.schemas.car import CarResponse
+from app.schemas.car import CarResponse, CarListResponse
 from app.schemas.common import PaginatedResponseModel, PaginatedMeta, ResponseModel
 from app.services.car_service import car_service
 
 router = APIRouter(prefix="/cars", tags=["cars"])
 
-@router.get("", response_model=PaginatedResponseModel[List[CarResponse]])
+@router.get("", response_model=PaginatedResponseModel[List[CarListResponse]])
 async def get_cars(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
@@ -23,10 +23,22 @@ async def get_cars(
         max_price=max_price, status=status, transmission=transmission, 
         year=year, car_type=type
     )
+    
+    list_data = [
+        CarListResponse(
+            car_id=str(c.id),
+            brand=c.brand,
+            model=c.model,
+            price=c.price,
+            condition=c.condition,
+            thumbnail_url=c.images[0] if c.images else ""
+        ) for c in cars
+    ]
+    
     meta = PaginatedMeta(total=total, page=page, limit=limit)
-    return PaginatedResponseModel(data=cars, meta=meta, message="Cars retrieved successfully")
+    return PaginatedResponseModel(data=list_data, meta=meta, message="Cars retrieved successfully")
 
 @router.get("/{car_id}", response_model=ResponseModel[CarResponse])
 async def get_car(car_id: str = Path(...)):
     car = await car_service.get_car(car_id)
-    return ResponseModel(data=car, message="Car retrieved successfully")
+    return ResponseModel(data=CarResponse.from_model(car), message="Car retrieved successfully")

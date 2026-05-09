@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, Path
 from typing import List
-from app.schemas.schedule import ScheduleCreate, ScheduleResponse, ScheduleDetailResponse
+from app.schemas.schedule import ScheduleCreate, ScheduleResponse, ScheduleDetailResponse, MyAppointmentsResponse
 from app.schemas.common import ResponseModel, PaginatedResponseModel, PaginatedMeta
 from app.services.schedule_service import schedule_service
 from app.core.dependencies import get_current_customer
@@ -13,15 +13,14 @@ async def create_schedule(schedule_in: ScheduleCreate, current_user: User = Depe
     schedule = await schedule_service.create_schedule(current_user, schedule_in)
     return ResponseModel(data=schedule, message="Schedule created successfully")
 
-@router.get("/me", response_model=PaginatedResponseModel[List[ScheduleResponse]])
+@router.get("/me", response_model=ResponseModel[MyAppointmentsResponse])
 async def get_my_schedules(
     page: int = Query(1, ge=1),
     limit: int = Query(10, ge=1, le=100),
     current_user: User = Depends(get_current_customer)
 ):
-    schedules, total = await schedule_service.get_my_schedules(current_user, page, limit)
-    meta = PaginatedMeta(total=total, page=page, limit=limit)
-    return PaginatedResponseModel(data=schedules, meta=meta, message="Schedules retrieved successfully")
+    result = await schedule_service.get_my_schedules(current_user, page, limit)
+    return ResponseModel(data=result, message="Schedules retrieved successfully")
 
 @router.get("/{schedule_id}", response_model=ResponseModel[ScheduleDetailResponse])
 async def get_schedule(schedule_id: str = Path(...), current_user: User = Depends(get_current_customer)):

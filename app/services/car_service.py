@@ -19,11 +19,58 @@ class CarService:
         return car
 
     async def create_car(self, car_in: CarCreate):
-        return await car_repo.create(car_in)
+        # Flatten specifications
+        specs = car_in.specifications
+        # Parse mileage "45000 km" -> 45000
+        mileage_int = 0
+        try:
+            mileage_int = int(''.join(filter(str.isdigit, specs.mileage)))
+        except ValueError:
+            pass
+
+        car_dict = {
+            "brand": car_in.brand,
+            "model": car_in.model,
+            "price": car_in.price,
+            "condition": car_in.condition,
+            "year": specs.year,
+            "transmission": specs.transmission,
+            "mileage": mileage_int,
+            "fuel": specs.fuel,
+            "color": specs.color,
+            "car_type": specs.type,
+            "description": car_in.description,
+            "features": car_in.features,
+            "images": car_in.images,
+            "status": "Tersedia"
+        }
+        from app.models.car import Car
+        car = Car(**car_dict)
+        await car.insert()
+        return car
 
     async def update_car(self, car_id: str, car_in: CarUpdate):
         car = await self.get_car(car_id)
-        return await car_repo.update(car, car_in)
+        update_data = car_in.model_dump(exclude_unset=True)
+        
+        if "specifications" in update_data:
+            specs = update_data.pop("specifications")
+            if "year" in specs: update_data["year"] = specs["year"]
+            if "transmission" in specs: update_data["transmission"] = specs["transmission"]
+            if "color" in specs: update_data["color"] = specs["color"]
+            if "fuel" in specs: update_data["fuel"] = specs["fuel"]
+            if "type" in specs: update_data["car_type"] = specs["type"]
+            if "mileage" in specs:
+                try:
+                    update_data["mileage"] = int(''.join(filter(str.isdigit, specs["mileage"])))
+                except ValueError:
+                    pass
+        
+        for field, value in update_data.items():
+            setattr(car, field, value)
+        
+        await car.save()
+        return car
 
     async def update_car_status(self, car_id: str, status_in: CarStatusUpdate):
         car = await self.get_car(car_id)

@@ -7,7 +7,7 @@ import os
 
 from app.core.config import settings
 from app.core.database import init_db, close_db
-from app.routes.v1 import auth, cars, admin_cars, schedules, admin_schedules, admin_stats, upload, ai
+from app.routes.v1 import auth, cars, admin_cars, schedules, admin_schedules, admin_stats, upload, ai, locations, available_slots
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -43,11 +43,15 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(cars.router, prefix="/api/v1")
 app.include_router(admin_cars.router, prefix="/api/v1")
+app.include_router(available_slots.router, prefix="/api/v1") # Pindahkan ke sini
 app.include_router(schedules.router, prefix="/api/v1")
 app.include_router(admin_schedules.router, prefix="/api/v1")
 app.include_router(admin_stats.router, prefix="/api/v1")
 app.include_router(upload.router, prefix="/api/v1")
-app.include_router(ai.router, prefix="/api/v1")
+app.include_router(ai.chat_router, prefix="/api/v1")
+app.include_router(ai.ai_router, prefix="/api/v1")
+app.include_router(locations.router, prefix="/api/v1")
+app.include_router(locations.admin_router, prefix="/api/v1")
 
 # Mount uploads directory to serve static files
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")

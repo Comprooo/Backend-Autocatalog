@@ -19,7 +19,14 @@ class ScheduleRepository(BaseRepository[Schedule]):
         schedules = await query.skip(skip).limit(limit).to_list()
         return schedules, total
 
-    async def count_by_status(self, status: str) -> int:
-        return await self.model.find(self.model.status == status).count()
+    async def count_by_status(self, status: str, year: Optional[int] = None) -> int:
+        query = {"status": status}
+        if year:
+            from datetime import datetime, timezone
+            start_date = datetime(year, 1, 1, tzinfo=timezone.utc)
+            end_date = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
+            query["created_at"] = {"$gte": start_date, "$lte": end_date}
+            
+        return await self.model.find(query).count()
 
 schedule_repo = ScheduleRepository()

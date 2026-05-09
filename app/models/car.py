@@ -5,13 +5,15 @@ from typing import List, Optional
 
 class Car(Document):
     brand: str
-    type: str
+    model: str
     year: int
     price: float
+    condition: str = ""
     transmission: str # e.g., Automatic, Manual
     mileage: int
     fuel: str # e.g., Bensin, Diesel, Listrik
     color: str
+    car_type: str = "MPV" # e.g., MPV, SUV, Sedan
     description: str
     status: str = "Tersedia" # "Tersedia", "Terjual"
     features: List[str] = []

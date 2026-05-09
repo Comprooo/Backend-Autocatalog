@@ -13,6 +13,8 @@ async def init_db():
     from app.models.car import Car
     from app.models.schedule import Schedule
     from app.models.chat import ChatHistory
+    from app.models.location import Location
+    from app.models.available_slot import AvailableSlot
 
     db.client = AsyncIOMotorClient(settings.MONGODB_URL)
     database = db.client[settings.MONGODB_DB_NAME]
@@ -23,7 +25,9 @@ async def init_db():
             User,
             Car,
             Schedule,
-            ChatHistory
+            ChatHistory,
+            Location,
+            AvailableSlot
         ]
     )
 

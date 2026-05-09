@@ -29,7 +29,7 @@ class CarRepository(BaseRepository[Car]):
         if year:
             query["year"] = year
         if car_type:
-            query["type"] = {"$regex": car_type, "$options": "i"}
+            query["car_type"] = {"$regex": car_type, "$options": "i"}
             
         if min_price is not None or max_price is not None:
             price_query = {}
@@ -44,7 +44,10 @@ class CarRepository(BaseRepository[Car]):
         
         return cars, total
 
-    async def count_by_status(self, status: str) -> int:
-        return await self.model.find(self.model.status == status).count()
+    async def count_by_status(self, status: str, year: Optional[int] = None) -> int:
+        query = {"status": status}
+        if year:
+            query["year"] = year
+        return await self.model.find(query).count()
 
 car_repo = CarRepository()

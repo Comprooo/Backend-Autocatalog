@@ -27,6 +27,8 @@ class UserResponse(BaseModel):
     @field_validator("id", mode="before")
     @classmethod
     def serialize_id(cls, v: Any) -> str:
+        if v is None:
+            return v
         return str(v)
 
 class TokenResponse(BaseModel):
