@@ -22,9 +22,9 @@ services:
       - MONGODB_DB_NAME=car_db
       - JWT_SECRET_KEY=supersecretkey-change-this-in-production
       - INTERNAL_SERVICE_TOKEN=internal-ai-secret-token
-      - CLOUDINARY_CLOUD_NAME=dummy
-      - CLOUDINARY_API_KEY=dummy
-      - CLOUDINARY_API_SECRET=dummy
+      - CLOUDINARY_CLOUD_NAME=dp4visgbh
+      - CLOUDINARY_API_KEY=973616849892656
+      - CLOUDINARY_API_SECRET=35tUFXGMLloa-Eqjpjm3Z2Qj6O4
     command: python seed/seed_db.py
     depends_on:
       - mongodb
