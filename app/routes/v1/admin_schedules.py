@@ -19,8 +19,9 @@ async def get_all_schedules(
 @router.get("/{schedule_id}", response_model=ResponseModel[ScheduleDetailResponse])
 async def get_schedule_detail(schedule_id: str = Path(...)):
     schedule = await schedule_service.get_schedule(schedule_id)
-    from app.services.car_service import car_service
-    car = await car_service.get_car(str(schedule.car_id))
+    from app.repositories.car_repo import car_repo
+    from app.schemas.car import CarResponse
+    car = await car_repo.get(schedule.car_id)
     
     from app.models.available_slot import AvailableSlot
     from app.models.location import Location
@@ -34,7 +35,7 @@ async def get_schedule_detail(schedule_id: str = Path(...)):
     schedule_data["user_id"] = str(schedule.user_id)
     schedule_data["car_id"] = str(schedule.car_id)
     schedule_data["slot_id"] = str(schedule.slot_id)
-    schedule_data["car"] = car
+    schedule_data["car"] = CarResponse.from_model(car) if car else None
     schedule_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
     
     return ResponseModel(data=ScheduleDetailResponse(**schedule_data), message="Schedule detail retrieved")

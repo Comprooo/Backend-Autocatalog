@@ -57,7 +57,10 @@ class ScheduleService:
         
         detailed_appointments = []
         for s in schedules:
-            car = await car_service.get_car(str(s.car_id))
+            from app.repositories.car_repo import car_repo
+            from app.schemas.car import CarResponse
+            car = await car_repo.get(s.car_id)
+            
             from app.models.available_slot import AvailableSlot
             slot_model = await AvailableSlot.get(s.slot_id)
             location = await Location.get(slot_model.location_id) if slot_model else None
@@ -67,7 +70,7 @@ class ScheduleService:
             s_data["user_id"] = str(s.user_id)
             s_data["car_id"] = str(s.car_id)
             s_data["slot_id"] = str(s.slot_id)
-            s_data["car"] = car
+            s_data["car"] = CarResponse.from_model(car) if car else None
             s_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
             detailed_appointments.append(ScheduleDetailResponse(**s_data))
 

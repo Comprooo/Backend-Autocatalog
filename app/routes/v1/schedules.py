@@ -31,15 +31,25 @@ async def get_schedule(schedule_id: str = Path(...), current_user: User = Depend
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Not authorized")
     
-    from app.services.car_service import car_service
-    car = await car_service.get_car(str(schedule.car_id))
+    from app.repositories.car_repo import car_repo
+    from app.schemas.car import CarResponse
+    car = await car_repo.get(schedule.car_id)
+    
+    from app.models.available_slot import AvailableSlot
+    from app.models.location import Location
+    from app.schemas.available_slot import AvailableSlotResponse
+    
+    slot_model = await AvailableSlot.get(schedule.slot_id)
+    location = await Location.get(slot_model.location_id) if slot_model else None
     
     # We combine schedule data and car data into a dictionary for the response model
     schedule_data = schedule.model_dump()
     schedule_data["id"] = str(schedule.id)
     schedule_data["user_id"] = str(schedule.user_id)
     schedule_data["car_id"] = str(schedule.car_id)
-    schedule_data["car"] = car
+    schedule_data["slot_id"] = str(schedule.slot_id)
+    schedule_data["car"] = CarResponse.from_model(car) if car else None
+    schedule_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
     
     return ResponseModel(data=ScheduleDetailResponse(**schedule_data), message="Schedule retrieved successfully")
 
