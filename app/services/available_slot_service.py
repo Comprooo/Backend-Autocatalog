@@ -27,9 +27,9 @@ class AvailableSlotService:
         from datetime import datetime, timezone
         today = datetime.now(timezone.utc).date()
         
-        # Masukkan filter ke dalam list
+        # Menggunakan $expr untuk perbandingan antar field agar lebih akurat di MongoDB
         filters = [
-            AvailableSlot.booked_count < AvailableSlot.quota,
+            {"$expr": {"$lt": ["$booked_count", "$quota"]}},
             AvailableSlot.date >= today
         ]
         
@@ -38,8 +38,11 @@ class AvailableSlotService:
         if slot_date:
             filters.append(AvailableSlot.date == slot_date)
         
-        # Jalankan query dengan membongkar list filters (*filters)
+        # Jalankan query
         slots = await AvailableSlot.find(*filters).sort(+AvailableSlot.date, +AvailableSlot.time_start).to_list()
+        
+        # Debug log (bisa dihapus nanti)
+        print(f"DEBUG: Found {len(slots)} slots for today ({today}) onwards")
         
         # Load locations for response
         location_ids = list(set([s.location_id for s in slots]))
