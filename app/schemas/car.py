@@ -39,8 +39,31 @@ class CarListResponse(BaseModel):
     brand: str
     model: str
     price: float
+    year: int
+    transmission: str
+    mileage: int
+    fuel: str
+    car_type: str
+    status: str
     condition: str
     thumbnail_url: str
+
+    @classmethod
+    def from_model(cls, c: Any):
+        return cls(
+            car_id=str(c.id),
+            brand=c.brand,
+            model=c.model,
+            price=c.price,
+            year=c.year,
+            transmission=c.transmission,
+            mileage=c.mileage,
+            fuel=c.fuel,
+            car_type=c.car_type,
+            status=c.status,
+            condition=c.condition,
+            thumbnail_url=c.images[0] if c.images else ""
+        )
 
 class CarResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

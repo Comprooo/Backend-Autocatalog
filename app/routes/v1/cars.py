@@ -24,16 +24,7 @@ async def get_cars(
         year=year, car_type=type
     )
     
-    list_data = [
-        CarListResponse(
-            car_id=str(c.id),
-            brand=c.brand,
-            model=c.model,
-            price=c.price,
-            condition=c.condition,
-            thumbnail_url=c.images[0] if c.images else ""
-        ) for c in cars
-    ]
+    list_data = [CarListResponse.from_model(c) for c in cars]
     
     meta = PaginatedMeta(total=total, page=page, limit=limit)
     return PaginatedResponseModel(data=list_data, meta=meta, message="Cars retrieved successfully")
