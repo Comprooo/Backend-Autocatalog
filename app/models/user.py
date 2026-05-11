@@ -9,6 +9,7 @@ class User(Document):
     phone: str = ""
     hashed_password: str
     role: str = "customer" # "customer", "admin", "internal_ai_service"
+    last_activity: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

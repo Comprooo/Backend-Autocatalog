@@ -10,7 +10,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
     from beanie import PydanticObjectId
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # Tambahkan leeway (toleransi) 60 detik untuk sinkronisasi waktu
+        payload = jwt.decode(
+            token, 
+            settings.JWT_SECRET_KEY, 
+            algorithms=[settings.JWT_ALGORITHM],
+            options={"leeway": 60}
+        )
         user_id: str = payload.get("sub")
         token_type: str = payload.get("type")
         
@@ -28,6 +34,24 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
                 detail="User not found",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
+        # ─── INACTIVITY TIMEOUT LOGIC (3 Hours) ───
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        
+        # Jika user sudah tidak aktif lebih dari 3 jam
+        if user.last_activity and (now - user.last_activity) > timedelta(hours=3):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired due to inactivity (3 hours). Please login again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Update last_activity (kita update tiap minimal 1 menit agar tidak terlalu membebani DB)
+        if not user.last_activity or (now - user.last_activity) > timedelta(minutes=1):
+            user.last_activity = now
+            await user.save()
+            
         return user
 
     except jwt.ExpiredSignatureError:

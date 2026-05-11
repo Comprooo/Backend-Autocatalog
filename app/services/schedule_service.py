@@ -16,16 +16,25 @@ class ScheduleService:
         # Verify car exists
         car = await car_service.get_car(schedule_in.car_id)
         
-        # Verify slot exists and is available
-        from app.services.available_slot_service import available_slot_service
-        slot = await available_slot_service.get_slot(schedule_in.slot_id)
+        # ATOMIC UPDATE: Check and increment in ONE command to prevent race conditions
+        from app.models.available_slot import AvailableSlot
+        result = await AvailableSlot.find_one(
+            AvailableSlot.id == PydanticObjectId(schedule_in.slot_id),
+            AvailableSlot.booked_count < AvailableSlot.quota
+        ).update({"$inc": {"booked_count": 1}})
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=400, detail="Slot is already full or no longer exists")
         
-        if slot.booked_count >= slot.quota:
-            raise HTTPException(status_code=400, detail="Slot is already full")
-        
+        # Re-fetch for validation and data creation
+        slot = await AvailableSlot.get(PydanticObjectId(schedule_in.slot_id))
+
         # Business rule: date must not be in the past
         now_date = datetime.now(timezone.utc).date()
         if slot.date < now_date:
+            # Rollback increment if date is invalid
+            slot.booked_count -= 1
+            await slot.save()
             raise HTTPException(status_code=400, detail="Cannot book a slot in the past")
 
         data = {
@@ -36,11 +45,6 @@ class ScheduleService:
             "status": "pending"
         }
         schedule = await schedule_repo.create(data)
-        
-        # Update slot booked count
-        slot.booked_count += 1
-        await slot.save()
-        
         return schedule
 
     async def get_my_schedules(self, user: User, page: int, limit: int):

@@ -178,11 +178,13 @@ async def seed_schedules(users: list[User], cars: list[Car], slots: list[Availab
         print("  SKIP  : Tidak ada cukup data untuk membuat sample schedule")
         return
 
-    # Buat maksimal 3 sample booking
+    # Buat maksimal 3 sample booking dengan slot yang berbeda-beda
     sample_bookings = [
         (customers[0], available_cars[0], available_slots[0], "Ingin test drive weekend ini"),
         (customers[1], available_cars[1], available_slots[1], "Tertarik untuk melihat kondisi langsung"),
-        (customers[2], available_cars[0], available_slots[2] if len(available_slots) > 2 else available_slots[0], "Mau survey dulu sebelum beli"),
+        (customers[2], available_cars[2] if len(available_cars) > 2 else available_cars[0], 
+         available_slots[2] if len(available_slots) > 2 else available_slots[0], 
+         "Mau survey dulu sebelum beli"),
     ]
 
     for user, car, slot, notes in sample_bookings:
