@@ -206,8 +206,9 @@ async def seed_schedules(users: list[User], cars: list[Car], slots: list[Availab
         )
         await schedule.insert()
 
-        # Update booked_count pada slot yang digunakan
-        slot.booked_count += 1
+        # Update slot sesuai konsep: Quota jadi 0 (habis), Booked jadi 1
+        slot.booked_count = 1
+        slot.quota = 0
         await slot.save()
 
         print(f"  INSERT: {user.username} -> {car.brand} {car.model} @ slot {slot.date} {slot.time_start}")
@@ -227,6 +228,15 @@ async def seed():
         database=client[settings.MONGODB_DB_NAME],
         document_models=[Car, User, Location, AvailableSlot, Schedule, ChatHistory]
     )
+
+    # BERSIHKAN DATA LAMA (Optional, tapi sangat disarankan agar data selalu sinkron)
+    print("\n  CLEANING: Menghapus data lama agar sinkron...")
+    await Schedule.find_all().delete()
+    await AvailableSlot.find_all().delete()
+    await Car.find_all().delete()
+    await Location.find_all().delete()
+    # Note: User tidak dihapus agar login admin tetap aman, 
+    # tapi jika ingin full reset bisa tambahkan: await User.find_all().delete()
 
     users     = await seed_users()
     locations = await seed_locations()

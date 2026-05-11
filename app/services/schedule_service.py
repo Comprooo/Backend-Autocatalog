@@ -16,15 +16,15 @@ class ScheduleService:
         # Verify car exists
         car = await car_service.get_car(schedule_in.car_id)
         
-        # ATOMIC UPDATE: Check and increment in ONE command to prevent race conditions
+        # ATOMIC UPDATE: Set quota to 0 and booked_count to 1 in ONE command
         from app.models.available_slot import AvailableSlot
         result = await AvailableSlot.find_one(
             AvailableSlot.id == PydanticObjectId(schedule_in.slot_id),
-            AvailableSlot.booked_count < AvailableSlot.quota
-        ).update({"$inc": {"booked_count": 1}})
+            AvailableSlot.quota > 0  # Cek apakah sisa kuota masih ada
+        ).update({"$set": {"quota": 0, "booked_count": 1}})
 
         if result.modified_count == 0:
-            raise HTTPException(status_code=400, detail="Slot is already full or no longer exists")
+            raise HTTPException(status_code=400, detail="Slot is already booked or no longer exists")
         
         # Re-fetch for validation and data creation
         slot = await AvailableSlot.get(PydanticObjectId(schedule_in.slot_id))
@@ -116,8 +116,9 @@ class ScheduleService:
         if old_status in ["pending", "confirmed"]:
             from app.models.available_slot import AvailableSlot
             slot = await AvailableSlot.get(schedule.slot_id)
-            if slot and slot.booked_count > 0:
-                slot.booked_count -= 1
+            if slot:
+                slot.booked_count = 0
+                slot.quota = 1
                 await slot.save()
         
         return schedule
@@ -136,8 +137,9 @@ class ScheduleService:
         if status_update.status == "cancelled" and old_status in ["pending", "confirmed"]:
             from app.models.available_slot import AvailableSlot
             slot = await AvailableSlot.get(schedule.slot_id)
-            if slot and slot.booked_count > 0:
-                slot.booked_count -= 1
+            if slot:
+                slot.booked_count = 0
+                slot.quota = 1
                 await slot.save()
         
         return schedule
@@ -149,8 +151,9 @@ class ScheduleService:
         if schedule.status in ["pending", "confirmed"]:
             from app.models.available_slot import AvailableSlot
             slot = await AvailableSlot.get(schedule.slot_id)
-            if slot and slot.booked_count > 0:
-                slot.booked_count -= 1
+            if slot:
+                slot.booked_count = 0
+                slot.quota = 1
                 await slot.save()
                 
         await schedule_repo.delete(schedule.id)
