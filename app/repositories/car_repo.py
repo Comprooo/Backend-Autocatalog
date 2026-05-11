@@ -1,6 +1,7 @@
 from app.repositories.base import BaseRepository
 from app.models.car import Car
 from typing import List, Tuple, Optional
+import re
 
 class CarRepository(BaseRepository[Car]):
     def __init__(self):
@@ -21,15 +22,15 @@ class CarRepository(BaseRepository[Car]):
         
         query = {}
         if brand:
-            query["brand"] = {"$regex": brand, "$options": "i"}
+            query["brand"] = {"$regex": re.escape(brand), "$options": "i"}
         if status:
             query["status"] = status
         if transmission:
-            query["transmission"] = {"$regex": transmission, "$options": "i"}
+            query["transmission"] = {"$regex": re.escape(transmission), "$options": "i"}
         if year:
             query["year"] = year
         if car_type:
-            query["car_type"] = {"$regex": car_type, "$options": "i"}
+            query["car_type"] = {"$regex": re.escape(car_type), "$options": "i"}
             
         if min_price is not None or max_price is not None:
             price_query = {}
