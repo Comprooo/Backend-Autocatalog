@@ -39,6 +39,8 @@ class CarListResponse(BaseModel):
     brand: str
     model: str
     price: float
+    year: int
+    transmission: str
     status: str
     condition: str
     thumbnail_url: str
@@ -50,6 +52,8 @@ class CarListResponse(BaseModel):
             brand=c.brand,
             model=c.model,
             price=c.price,
+            year=c.year,
+            transmission=c.transmission,
             status=c.status,
             condition=c.condition,
             thumbnail_url=c.images[0] if c.images else ""
