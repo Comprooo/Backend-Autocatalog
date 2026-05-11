@@ -8,11 +8,11 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongodb:27017
       - MONGODB_DB_NAME=car_db
-      - JWT_SECRET_KEY=supersecretkey-change-this-in-production
-      - INTERNAL_SERVICE_TOKEN=internal-ai-secret-token
-      - CLOUDINARY_CLOUD_NAME=dp4visgbh
-      - CLOUDINARY_API_KEY=973616849892656
-      - CLOUDINARY_API_SECRET=35tUFXGMLloa-Eqjpjm3Z2Qj6O4
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
     depends_on:
       - mongodb
     volumes:
@@ -23,11 +23,11 @@ services:
     environment:
       - MONGODB_URL=mongodb://mongodb:27017
       - MONGODB_DB_NAME=car_db
-      - JWT_SECRET_KEY=supersecretkey-change-this-in-production
-      - INTERNAL_SERVICE_TOKEN=internal-ai-secret-token
-      - CLOUDINARY_CLOUD_NAME=dp4visgbh
-      - CLOUDINARY_API_KEY=973616849892656
-      - CLOUDINARY_API_SECRET=35tUFXGMLloa-Eqjpjm3Z2Qj6O4
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - INTERNAL_SERVICE_TOKEN=${INTERNAL_SERVICE_TOKEN}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
     command: python seed/seed_db.py
     depends_on:
       - mongodb
