@@ -39,8 +39,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
         from datetime import datetime, timezone, timedelta
         now = datetime.now(timezone.utc)
         
+        # Pastikan last_activity punya info timezone UTC untuk dibandingkan
+        last_act = user.last_activity
+        if last_act and last_act.tzinfo is None:
+            last_act = last_act.replace(tzinfo=timezone.utc)
+
         # Jika user sudah tidak aktif lebih dari 3 jam
-        if user.last_activity and (now - user.last_activity) > timedelta(hours=3):
+        if last_act and (now - last_act) > timedelta(hours=3):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Session expired due to inactivity (3 hours). Please login again.",
@@ -48,7 +53,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
             )
 
         # Update last_activity (kita update tiap minimal 1 menit agar tidak terlalu membebani DB)
-        if not user.last_activity or (now - user.last_activity) > timedelta(minutes=1):
+        if not last_act or (now - last_act) > timedelta(minutes=1):
             user.last_activity = now
             await user.save()
             
@@ -60,11 +65,19 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
             detail="Token has expired. Please login again.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except (JWTError, Exception) as e:
-        print(f"Auth Error: {str(e)}")
+    except Exception as e:
+        # Tampilkan error asli di log server untuk debugging
+        import logging
+        logging.error(f"AUTH ERROR: {str(e)}")
+        
+        # Berikan pesan yang sedikit lebih detail jika itu bukan masalah JWT
+        error_msg = "Could not validate credentials"
+        if "User not found" in str(e):
+            error_msg = "User in token no longer exists. Please login again."
+            
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail=error_msg,
             headers={"WWW-Authenticate": "Bearer"},
         )
 

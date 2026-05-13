@@ -6,6 +6,8 @@ from app.schemas.car import CarResponse
 class ScheduleCreate(BaseModel):
     car_id: str
     slot_id: str
+    email: str
+    phone: str
     notes: Optional[str] = None
 
 class ScheduleStatusUpdate(BaseModel):
@@ -23,6 +25,8 @@ class ScheduleResponse(BaseModel):
     user_id: Any
     car_id: Any
     slot_id: Any
+    email: str
+    phone: str
     notes: Optional[str] = None
     status: str
     created_at: datetime

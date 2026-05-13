@@ -41,6 +41,8 @@ class ScheduleService:
             "user_id": user.id,
             "car_id": car.id,
             "slot_id": slot.id,
+            "email": schedule_in.email,
+            "phone": schedule_in.phone,
             "notes": schedule_in.notes,
             "status": "pending"
         }

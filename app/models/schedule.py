@@ -10,6 +10,8 @@ class Schedule(Document):
     car_id: PydanticObjectId
     slot_id: PydanticObjectId
     notes: Optional[str] = None
+    email: str
+    phone: str
     status: str = "pending" # "pending", "confirmed", "cancelled", "completed"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

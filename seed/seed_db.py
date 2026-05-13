@@ -178,40 +178,52 @@ async def seed_schedules(users: list[User], cars: list[Car], slots: list[Availab
         print("  SKIP  : Tidak ada cukup data untuk membuat sample schedule")
         return
 
-    # Buat maksimal 3 sample booking dengan slot yang berbeda-beda
+    # Buat variasi sample booking dengan berbagai status
     sample_bookings = [
-        (customers[0], available_cars[0], available_slots[0], "Ingin test drive weekend ini"),
-        (customers[1], available_cars[1], available_slots[1], "Tertarik untuk melihat kondisi langsung"),
+        (customers[0], available_cars[0], available_slots[0], "pending", "Ingin test drive weekend ini"),
+        (customers[1], available_cars[1], available_slots[1], "confirmed", "Tertarik untuk melihat kondisi langsung"),
         (customers[2], available_cars[2] if len(available_cars) > 2 else available_cars[0], 
          available_slots[2] if len(available_slots) > 2 else available_slots[0], 
-         "Mau survey dulu sebelum beli"),
+         "completed", "Sudah cek unit kemarin"),
+        (customers[3] if len(customers) > 3 else customers[0], 
+         available_cars[3] if len(available_cars) > 3 else available_cars[0], 
+         available_slots[3] if len(available_slots) > 3 else available_slots[0], 
+         "cancelled", "Maaf tidak jadi karena ada keperluan mendadak"),
     ]
 
-    for user, car, slot, notes in sample_bookings:
+    for user, car, slot, status, notes in sample_bookings:
         # Cek apakah sudah ada booking dengan kombinasi yang sama
         existing = await Schedule.find_one(
             Schedule.user_id == user.id,
             Schedule.slot_id == slot.id
         )
         if existing:
-            print(f"  SKIP  : Booking {user.username} -> {car.brand} {car.model} (already exists)")
             continue
 
         schedule = Schedule(
             user_id=user.id,
             car_id=car.id,
             slot_id=slot.id,
+            email=user.email,
+            phone=user.phone,
             notes=notes,
-            status="pending"
+            status=status
         )
         await schedule.insert()
 
-        # Update slot sesuai konsep: Quota jadi 0 (habis), Booked jadi 1
-        slot.booked_count = 1
-        slot.quota = 0
-        await slot.save()
+        # Update slot berdasarkan status:
+        # Jika status 'cancelled', maka slot tetap tersedia (quota 1, booked 0)
+        # Jika status lainnya, maka slot habis (quota 0, booked 1)
+        if status != "cancelled":
+            slot.booked_count = 1
+            slot.quota = 0
+            await slot.save()
+        else:
+            slot.booked_count = 0
+            slot.quota = 1
+            await slot.save()
 
-        print(f"  INSERT: {user.username} -> {car.brand} {car.model} @ slot {slot.date} {slot.time_start}")
+        print(f"  INSERT: {user.username} -> {car.brand} ({status}) @ {slot.date}")
 
 # ─────────────────────────────────────────────
 # MAIN

@@ -10,6 +10,7 @@ class AdminService:
         pending_schedules = await schedule_repo.count_by_status("pending", year)
         confirmed_schedules = await schedule_repo.count_by_status("confirmed", year)
         cancelled_schedules = await schedule_repo.count_by_status("cancelled", year)
+        completed_schedules = await schedule_repo.count_by_status("completed", year)
         
         return {
             "inventory": {
@@ -18,7 +19,9 @@ class AdminService:
             },
             "appointments": {
                 "pending": pending_schedules,
-                "confirmed": confirmed_schedules
+                "confirmed": confirmed_schedules,
+                "cancelled": cancelled_schedules,
+                "completed": completed_schedules
             }
         }
 
