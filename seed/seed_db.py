@@ -181,13 +181,12 @@ async def seed_schedules(users: list[User], cars: list[Car], slots: list[Availab
     # Buat variasi sample booking UTAMA untuk Ale (customers[1])
     sample_bookings = [
         # Ale punya 4 status berbeda
-        (customers[1], available_cars[0], available_slots[0], "pending", "Ale: Penasaran sama mobil ini"),
-        (customers[1], available_cars[1], available_slots[1], "confirmed", "Ale: Janji temu yang sudah fix"),
-        (customers[1], available_cars[2], available_slots[2], "completed", "Ale: Inspeksi yang sudah beres"),
-        (customers[1], available_cars[3], available_slots[3], "cancelled", "Ale: Yang ini gak jadi deh"),
+        (customers[1], available_cars[0], available_slots[0], "pending", "Penasaran sama mobil ini"),
+        (customers[1], available_cars[2], available_slots[2], "completed", "Inspeksi yang sudah beres"),
+        (customers[1], available_cars[3], available_slots[3], "cancelled", "Yang ini gak jadi deh"),
         
         # Tambahan untuk Arsyad sebagai pembanding
-        (customers[0], available_cars[4], available_slots[4], "pending", "Arsyad: Coba ajukan satu"),
+        (customers[0], available_cars[4], available_slots[4], "pending", "Coba ajukan satu"),
     ]
 
     for user, car, slot, status, notes in sample_bookings:
