@@ -56,6 +56,8 @@ class ScheduleService:
         # Calculate summary
         pending = await schedule_repo.model.find(schedule_repo.model.user_id == user.id, schedule_repo.model.status == "pending").count()
         confirmed = await schedule_repo.model.find(schedule_repo.model.user_id == user.id, schedule_repo.model.status == "confirmed").count()
+        cancelled = await schedule_repo.model.find(schedule_repo.model.user_id == user.id, schedule_repo.model.status == "cancelled").count()
+        completed = await schedule_repo.model.find(schedule_repo.model.user_id == user.id, schedule_repo.model.status == "completed").count()
         
         from app.schemas.schedule import ScheduleDetailResponse, AppointmentSummary, MyAppointmentsResponse
         from app.schemas.available_slot import AvailableSlotResponse
@@ -81,7 +83,13 @@ class ScheduleService:
             detailed_appointments.append(ScheduleDetailResponse(**s_data))
 
         return MyAppointmentsResponse(
-            summary=AppointmentSummary(total=total, pending=pending, confirmed=confirmed),
+            summary=AppointmentSummary(
+                total=total, 
+                pending=pending, 
+                confirmed=confirmed,
+                cancelled=cancelled,
+                completed=completed
+            ),
             appointments=detailed_appointments
         )
 

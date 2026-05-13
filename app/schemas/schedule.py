@@ -17,6 +17,8 @@ class AppointmentSummary(BaseModel):
     total: int
     pending: int
     confirmed: int
+    cancelled: int
+    completed: int
 
 class ScheduleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
