@@ -185,10 +185,16 @@ async def seed_schedules(users: list[User], cars: list[Car], slots: list[Availab
         (customers[2], available_cars[2] if len(available_cars) > 2 else available_cars[0], 
          available_slots[2] if len(available_slots) > 2 else available_slots[0], 
          "completed", "Sudah cek unit kemarin"),
+        
+        # Booking khusus untuk Ale
         (customers[3] if len(customers) > 3 else customers[0], 
-         available_cars[3] if len(available_cars) > 3 else available_cars[0], 
-         available_slots[3] if len(available_slots) > 3 else available_slots[0], 
-         "cancelled", "Maaf tidak jadi karena ada keperluan mendadak"),
+         available_cars[4] if len(available_cars) > 4 else available_cars[0], 
+         available_slots[4] if len(available_slots) > 4 else available_slots[0], 
+         "pending", "Ale mau liat mobil ini dong"),
+        (customers[3] if len(customers) > 3 else customers[0], 
+         available_cars[5] if len(available_cars) > 5 else available_cars[0], 
+         available_slots[5] if len(available_slots) > 5 else available_slots[0], 
+         "cancelled", "Ale gak jadi, sibuk tugas"),
     ]
 
     for user, car, slot, status, notes in sample_bookings:
