@@ -13,6 +13,10 @@ class ScheduleCreate(BaseModel):
 class ScheduleStatusUpdate(BaseModel):
     status: str
 
+class ScheduleReschedule(BaseModel):
+    new_slot_id: str
+    notes: Optional[str] = None
+
 class AppointmentSummary(BaseModel):
     total: int
     pending: int

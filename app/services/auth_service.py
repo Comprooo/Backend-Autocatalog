@@ -41,6 +41,11 @@ class AuthService:
         if not user or not verify_password(login_data.password, user.hashed_password):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
             
+        # Update last_activity saat login sukses agar session fresh
+        from datetime import datetime, timezone
+        user.last_activity = datetime.now(timezone.utc)
+        await user.save()
+
         access_token = create_access_token(data={"sub": str(user.id)})
         
         return TokenResponse(access_token=access_token, role=user.role)

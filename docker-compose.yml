@@ -16,7 +16,9 @@ services:
     depends_on:
       - mongodb
     volumes:
+      - .:/app
       - ./uploads:/app/uploads
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   seed:
     build: .

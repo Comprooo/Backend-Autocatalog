@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query, Path
 from typing import List
-from app.schemas.schedule import ScheduleCreate, ScheduleResponse, ScheduleDetailResponse, MyAppointmentsResponse
+from app.schemas.schedule import ScheduleCreate, ScheduleResponse, ScheduleDetailResponse, MyAppointmentsResponse, ScheduleReschedule
 from app.schemas.common import ResponseModel, PaginatedResponseModel, PaginatedMeta
 from app.services.schedule_service import schedule_service
 from app.core.dependencies import get_current_customer
@@ -58,5 +58,14 @@ async def get_schedule(schedule_id: str = Path(...), current_user: User = Depend
 async def cancel_schedule(schedule_id: str = Path(...), current_user: User = Depends(get_current_customer)):
     schedule = await schedule_service.cancel_schedule(current_user, schedule_id)
     return ResponseModel(data=schedule, message="Schedule cancelled successfully")
+
+@router.patch("/{schedule_id}/reschedule", response_model=ResponseModel[ScheduleResponse])
+async def reschedule(
+    reschedule_in: ScheduleReschedule,
+    schedule_id: str = Path(...), 
+    current_user: User = Depends(get_current_customer)
+):
+    schedule = await schedule_service.reschedule(current_user, schedule_id, reschedule_in)
+    return ResponseModel(data=schedule, message="Schedule rescheduled successfully. Waiting for admin confirmation.")
 
 

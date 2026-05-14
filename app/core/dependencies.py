@@ -68,16 +68,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(b
     except Exception as e:
         # Tampilkan error asli di log server untuk debugging
         import logging
-        logging.error(f"AUTH ERROR: {str(e)}")
+        logging.error(f"AUTH ERROR: {type(e).__name__} - {str(e)}")
         
-        # Berikan pesan yang sedikit lebih detail jika itu bukan masalah JWT
-        error_msg = "Could not validate credentials"
-        if "User not found" in str(e):
-            error_msg = "User in token no longer exists. Please login again."
-            
+        # Berikan pesan yang jauh lebih detail agar kita tahu rusaknya di mana
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=error_msg,
+            detail=f"Auth Error: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

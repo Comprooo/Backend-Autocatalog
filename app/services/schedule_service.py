@@ -169,7 +169,39 @@ class ScheduleService:
         await schedule_repo.delete(schedule.id)
         return True
 
-schedule_service = ScheduleService()
+    async def reschedule(self, user: User, schedule_id: str, reschedule_in: "ScheduleReschedule"):
+        from app.schemas.schedule import ScheduleReschedule
+        schedule = await self.get_schedule(schedule_id)
+        
+        # 1. Validasi kepemilikan dan status
+        if schedule.user_id != user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to reschedule this appointment")
+            
+        if schedule.status != "cancelled":
+            raise HTTPException(status_code=400, detail="Only cancelled appointments can be rescheduled")
 
+        # 2. ATOMIC UPDATE: Pesan slot baru
+        from app.models.available_slot import AvailableSlot
+        new_slot_id = PydanticObjectId(reschedule_in.new_slot_id)
+        
+        result = await AvailableSlot.find_one(
+            AvailableSlot.id == new_slot_id,
+            AvailableSlot.quota > 0
+        ).update({"$set": {"quota": 0, "booked_count": 1}})
+
+        if result.modified_count == 0:
+            raise HTTPException(status_code=400, detail="New slot is already booked or no longer exists")
+
+        # 3. Update data jadwal
+        schedule.slot_id = new_slot_id
+        schedule.status = "pending" # Kembali ke pending untuk dicek Admin
+        
+        if reschedule_in.notes:
+            schedule.notes = reschedule_in.notes
+            
+        schedule.updated_at = datetime.now(timezone.utc)
+        await schedule.save()
+        
+        return schedule
 
 schedule_service = ScheduleService()
