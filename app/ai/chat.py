@@ -1,6 +1,7 @@
 import httpx
 import json
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
@@ -38,7 +39,7 @@ class AIChatService:
                     "model": MODEL_NAME,
                     "messages": messages,
                     "stream": False,
-                    "options": {"temperature": 0.2} # Low temperature for more consistent JSON/logic
+                    "options": {"temperature": 0.2}
                 }, timeout=timeout)
                 data = res.json()
                 content = data.get("message", {}).get("content", "")
@@ -47,7 +48,79 @@ class AIChatService:
             print(f"Ollama Error: {e}")
             return ""
 
-    async def get_response(self, message: str, user: User, session_id: str = "default") -> dict:
+    async def _retrieve_relevant_cars(self, query: str, limit: int = 4):
+        query_tokens = set(re.findall(r"\w+", query.lower()))
+        if not query_tokens:
+            return []
+
+        cars, _ = await car_service.get_all_cars(page=1, limit=100)
+        scored = []
+        for c in cars:
+            searchable = " ".join([
+                c.brand or "",
+                c.model or "",
+                c.description or "",
+                c.car_type or "",
+                c.transmission or "",
+                c.fuel or "",
+                " ".join(c.features or [])
+            ]).lower()
+            score = sum(1 for token in query_tokens if token in searchable)
+            if score > 0:
+                scored.append((score, c))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return [item[1] for item in scored[:limit]]
+
+    def _detect_response_style(self, message: str) -> str:
+        text = message.lower()
+        if re.search(r"\b(ringkas|singkat|padat|sekilas|cepat|to the point)\b", text):
+            return "ringkas"
+        if re.search(r"\b(detail|lengkap|jelas|panjang|terperinci|mendalam|komprehensif)\b", text):
+            return "detail"
+        if re.search(r"\b(rekomendasi|saran|pilihkan|pilihan|terbaik|favorit)\b", text):
+            return "rekomendasi"
+        return "default"
+
+    async def _build_rag_context(self, message: str, user: User) -> tuple[str, bool]:
+        """Build RAG context and return (context, has_data)"""
+        parts = []
+        has_data = False
+        
+        relevant_cars = await self._retrieve_relevant_cars(message, limit=3)
+        if relevant_cars:
+            has_data = True
+            parts.append("Informasi inventaris relevan untuk pertanyaan ini:")
+            for c in relevant_cars:
+                parts.append(
+                    f"- {c.brand} {c.model} ({c.year}) [{c.car_type}] - Rp {c.price:,.0f} | {c.transmission} | {c.fuel} | Status: {c.status}"
+                )
+                if c.features:
+                    parts.append(f"  Fitur: {', '.join(c.features)}")
+                if c.description:
+                    parts.append(f"  Deskripsi: {c.description}")
+        else:
+            parts.append("Tidak ada data mobil yang relevan ditemukan dari inventaris saat ini.")
+
+        try:
+            my_bookings = await schedule_service.get_my_schedules(user, page=1, limit=3)
+            if getattr(my_bookings, 'appointments', None):
+                has_data = True
+                parts.append("Ringkasan jadwal Anda saat ini:")
+                for s in my_bookings.appointments:
+                    car_desc = f"{s.car.brand} {s.car.model}" if getattr(s, 'car', None) else "-"
+                    slot_desc = f"{s.slot.location.location_name if getattr(s, 'slot', None) and getattr(s.slot, 'location', None) else ''} {s.slot.date} {s.slot.time}" if getattr(s, 'slot', None) else ""
+                    parts.append(f"- ID: {s.id} | {car_desc} | {s.status} | {slot_desc}")
+        except Exception:
+            pass
+
+        return "\n".join(parts), has_data
+
+    async def get_response(self, message: str, user: User, session_id: Optional[str] = None) -> dict:
+        # Auto-generate session_id if not provided
+        if not session_id:
+            session_id = str(uuid.uuid4())
+        
         # 1. Get History
         history_doc = await self._get_or_create_history(session_id, user.id)
         history_messages = history_doc.messages
@@ -79,18 +152,22 @@ OUTPUT HARUS JSON SAJA:
 
         intent = nlu_data.get("intent", "GENERAL")
         params = nlu_data.get("params", {})
+        response_style = self._detect_response_style(message)
 
         # 3. STEP 2: Execution & Context Gathering
         context = ""
         car_recommendations = []
-        
+        rag_context, has_retrieval_data = await self._build_rag_context(message, user)
+
         try:
             if intent == "SEARCH_CAR":
                 brand = params.get("brand")
                 max_price = params.get("max_price")
                 if isinstance(max_price, str):
-                    if "juta" in max_price: max_price = int(max_price.replace("juta", "").strip()) * 1000000
-                    elif "jt" in max_price: max_price = int(max_price.replace("jt", "").strip()) * 1000000
+                    if "juta" in max_price:
+                        max_price = int(re.sub(r'[^0-9]', '', max_price)) * 1000000
+                    elif "jt" in max_price:
+                        max_price = int(re.sub(r'[^0-9]', '', max_price)) * 1000000
 
                 cars, _ = await car_service.get_all_cars(
                     page=1, limit=5, brand=brand, max_price=max_price,
@@ -99,11 +176,9 @@ OUTPUT HARUS JSON SAJA:
                 
                 if cars:
                     context = "Mobil ditemukan:\n" + "\n".join([f"- {c.brand} {c.model} (ID: {c.id}) - Rp {c.price:,.0f}" for c in cars])
+                    from app.schemas.car import CarResponse
                     for c in cars:
-                        car_recommendations.append({
-                            "car_id": str(c.id), "brand": c.brand, "model": c.model,
-                            "price": c.price, "thumbnail_url": c.images[0] if c.images else ""
-                        })
+                        car_recommendations.append(CarResponse.from_model(c).model_dump())
                 else:
                     context = "Tidak ada mobil ditemukan."
 
@@ -118,10 +193,12 @@ OUTPUT HARUS JSON SAJA:
                     context = "Tidak ada slot jadwal tersedia saat ini."
 
             elif intent == "MY_BOOKINGS":
-                from app.schemas.schedule import ScheduleFilter
-                my_schedules = await schedule_service.get_user_schedules(user, ScheduleFilter())
-                if my_schedules:
-                    context = "Jadwal Anda saat ini:\n" + "\n".join([f"- ID: {s.id} | Mobil: {s.car.brand} {s.car.model} | Status: {s.status} | Waktu: {s.date} {s.time}" for s in my_schedules])
+                my_schedules = await schedule_service.get_my_schedules(user, page=1, limit=5)
+                if getattr(my_schedules, 'appointments', None):
+                    context = "Jadwal Anda saat ini:\n" + "\n".join([
+                        f"- ID: {s.id} | Mobil: {s.car.brand} {s.car.model} | Status: {s.status} | Waktu: {s.slot.date if getattr(s, 'slot', None) else ''} {s.slot.time if getattr(s, 'slot', None) else ''}"
+                        for s in my_schedules.appointments
+                    ])
                 else:
                     context = "Anda belum memiliki jadwal janji temu."
 
@@ -145,10 +222,11 @@ OUTPUT HARUS JSON SAJA:
                 else:
                     context = "Tolong berikan ID Jadwal yang ingin dibatalkan. Anda bisa tanya 'apa jadwal saya' untuk melihat ID-nya."
 
+            else:
+                if not context:
+                    context = "Gunakan informasi inventaris relevan dan riwayat pengguna untuk menjawab." 
         except Exception as e:
             context = f"Terjadi kesalahan saat memproses permintaan: {str(e)}"
-
-        # 4. STEP 3: Generate Final Response
 
         # 4. STEP 3: Generate Final Response
         system_prompt = f"""Kamu adalah Showroom AI, asisten virtual proaktif di Dealer Mobil Premium.
@@ -158,22 +236,37 @@ Role Customer: {user.role}
 KONTEN REAL-TIME (Gunakan data ini):
 {context}
 
-TUGAS:
-1. Berikan jawaban yang ramah, profesional, dan informatif.
-2. Jika ada data mobil, sebutkan kelebihannya secara singkat.
-3. Jika tidak ada mobil yang cocok, sarankan unit lain atau tanya admin.
-4. Jangan mengarang data yang tidak ada di KONTEN REAL-TIME."""
+RETRIEVAL CONTEXT:
+{rag_context}
+
+PANDUAN JAWABAN:
+- JIKA ditemukan data relevan, MULAI dengan: \"Berikut adalah data yang saya temukan sesuai request anda:\"
+- Jawab sesuai keinginan user: jika user meminta ringkas, jawab ringkas; jika user meminta detail, jelaskan komprehensif.
+- Gunakan gaya bahasa yang sopan, profesional, dan mudah dimengerti.
+- Bila menawarkan mobil, jelaskan keunggulan utama dan kondisi terkini.
+- Bila tidak ada data yang relevan, akui keterbatasan dan tawarkan bantuan lanjutan.
+- Jangan mengarang fakta yang tidak ada di CONTEXT atau RETRIEVAL CONTEXT.
+- Bila diminta, berikan rekomendasi unit terbaik berdasarkan preferensi.
+
+GAYA JAWABAN: {response_style}"""
 
         messages = [{"role": "system", "content": system_prompt}] + history_messages + [{"role": "user", "content": message}]
         reply = await self._call_ollama(messages)
         if not reply:
             reply = "Maaf, saya sedang mengalami kendala teknis. Ada yang bisa saya bantu secara manual?"
 
+        if not car_recommendations and has_retrieval_data:
+            relevant_cars = await self._retrieve_relevant_cars(message, limit=3)
+            from app.schemas.car import CarResponse
+            for c in relevant_cars:
+                car_recommendations.append(CarResponse.from_model(c).model_dump())
+
         # 5. Save History
         await self._add_to_history(session_id, user.id, "user", message)
         await self._add_to_history(session_id, user.id, "assistant", reply)
 
         return {
+            "session_id": session_id,
             "reply": reply,
             "car_recommendations": car_recommendations
         }

@@ -12,17 +12,17 @@ chat_router = APIRouter(tags=["chat"])
 ai_router = APIRouter(prefix="/ai", tags=["ai"])
 
 class ChatRequest(BaseModel):
-    session_id: str
+    session_id: Optional[str] = None  # Auto-generate if not provided
     message: str
 
 class ChatData(BaseModel):
+    session_id: str  # Return session_id to client
     reply: str
     car_recommendations: List[Dict[str, Any]] = []
 
 @chat_router.post("/chat", response_model=ResponseModel[ChatData])
 async def chat(request: ChatRequest, current_user: User = Depends(get_current_user)):
     result = await ai_chat_service.get_response(request.message, current_user, request.session_id)
-    # result["user_role"] = current_user.role # Not in spec, but could be useful
     return ResponseModel(data=ChatData(**result), message="Chat processed")
 
 async def verify_internal_token(authorization: Optional[str] = Header(None)):
