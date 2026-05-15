@@ -13,6 +13,11 @@ from app.routes.v1 import auth, cars, admin_cars, schedules, admin_schedules, ad
 async def lifespan(app: FastAPI):
     # Startup
     await init_db()
+    
+    # Auto-generate available slots for the next 14 days
+    from app.services.available_slot_service import available_slot_service
+    await available_slot_service.generate_default_slots(days_ahead=14)
+    
     yield
     # Shutdown
     await close_db()

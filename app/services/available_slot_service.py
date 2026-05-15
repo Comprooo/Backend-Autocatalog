@@ -58,4 +58,45 @@ class AvailableSlotService:
             raise HTTPException(status_code=404, detail="Available slot not found")
         return slot
 
+    async def generate_default_slots(self, days_ahead: int = 14):
+        """Otomatis membuat slot kosong jika belum ada untuk 14 hari ke depan."""
+        from datetime import datetime, timezone, timedelta
+        from app.models.location import Location
+        
+        today = datetime.now(timezone.utc).date()
+        locations = await Location.find_all().to_list()
+        
+        # Template jam kerja (9 pagi - 5 sore)
+        work_hours = [
+            ("09:00", "10:00"), ("10:00", "11:00"), ("11:00", "12:00"),
+            ("13:00", "14:00"), ("14:00", "15:00"), ("15:00", "16:00"), ("16:00", "17:00")
+        ]
+
+        created_count = 0
+        for i in range(days_ahead):
+            target_date = today + timedelta(days=i)
+            for loc in locations:
+                for start, end in work_hours:
+                    # Cek apakah slot sudah ada
+                    exists = await AvailableSlot.find_one(
+                        AvailableSlot.location_id == loc.id,
+                        AvailableSlot.date == target_date,
+                        AvailableSlot.time_start == start
+                    )
+                    
+                    if not exists:
+                        new_slot = AvailableSlot(
+                            location_id=loc.id,
+                            date=target_date,
+                            time_start=start,
+                            time_end=end,
+                            quota=1, # Eksklusif 1 orang
+                            booked_count=0
+                        )
+                        await new_slot.insert()
+                        created_count += 1
+        
+        if created_count > 0:
+            print(f"AUTO-GEN: Created {created_count} new available slots for the next {days_ahead} days.")
+
 available_slot_service = AvailableSlotService()
