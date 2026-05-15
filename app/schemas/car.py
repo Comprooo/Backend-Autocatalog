@@ -71,7 +71,7 @@ class CarResponse(BaseModel):
     specifications: CarSpecifications
     features: List[str]
     description: str
-    images: List[str]
+    thumbnail: str
     created_at: datetime
     updated_at: datetime
 
@@ -101,7 +101,7 @@ class CarResponse(BaseModel):
             ),
             features=c.features,
             description=c.description,
-            images=c.images,
+            thumbnail=c.images[0] if c.images else "",
             created_at=c.created_at,
             updated_at=c.updated_at
         )

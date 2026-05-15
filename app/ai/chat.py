@@ -116,6 +116,145 @@ class AIChatService:
 
         return "\n".join(parts), has_data
 
+    def _rule_detect_booking(self, message: str, history: list) -> dict | None:
+        """
+        Rule-based booking detector. Checks if message + recent history signals CREATE_BOOKING.
+        Returns params dict (may be empty) if signal detected, None if no booking signal at all.
+        IMPORTANT: Always returns dict (not None) when booking signal found, so CREATE_BOOKING
+        handler shows the form template instead of falling back to NLU hallucination.
+        """
+        BOOKING_SIGNALS = [
+            r"\bbuat\b.*(jadwal|janji|temu|booking|appointment)",
+            r"\bjadwal\b.*(temu|ketemu|meeting|bertemu)",
+            r"\bingin\b.*(jadwal|booking|temu|janji)",
+            r"\bbuat\s+jadwal\b",
+            r"\bbikin\s+jadwal\b",
+            r"\bbooking\b",
+            r"\bappointment\b",
+            r"\bjanjian\b",
+            r"\bketemu\s+owner\b",
+            r"\btemu\s+owner\b",
+        ]
+        HISTORY_BOOKING_SIGNALS = [
+            r"jadwal", r"temu", r"booking", r"appointment", r"janjian",
+            r"bawa ke owner", r"bawa mobil", r"ketemu owner", r"temu owner"
+        ]
+
+        MONTH_MAP = {
+            "januari": 1, "februari": 2, "maret": 3, "april": 4,
+            "mei": 5, "juni": 6, "juli": 7, "agustus": 8,
+            "september": 9, "oktober": 10, "november": 11, "desember": 12
+        }
+
+        # Check if current message has a direct booking signal
+        msg_lower = message.lower()
+        msg_has_signal = any(re.search(p, msg_lower) for p in BOOKING_SIGNALS)
+
+        # Check if recent history (last 4 msgs) has booking context
+        recent_texts = " ".join([m.get("content", "") for m in history[-4:]]).lower()
+        history_has_signal = any(re.search(p, recent_texts) for p in HISTORY_BOOKING_SIGNALS)
+
+        if not (msg_has_signal or history_has_signal):
+            return None  # No booking signal → fall through to NLU
+
+        # Booking confirmed. Extract params from all user messages combined.
+        all_user_msgs = " ".join([m.get("content", "") for m in history if m.get("role") == "user"])
+        all_user_msgs += " " + message
+        combined = all_user_msgs.lower()
+        params = {}
+
+        # ── DATE EXTRACTION ───────────────────────────────────────────────
+        # Format 1: "2026/mei/18" or "2026-mei-18" (year/month_name/day)
+        mx = re.search(
+            r"(\d{4})[\/-](januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)[\/-](\d{1,2})",
+            combined
+        )
+        if mx:
+            params["date"] = f"{mx.group(1)}-{MONTH_MAP[mx.group(2)]:02d}-{int(mx.group(3)):02d}"
+
+        # Format 2: "18 mei" or "tanggal 18 mei"
+        if "date" not in params:
+            mx = re.search(
+                r"(?:tanggal\s*[=:]?\s*)?(\d{1,2})[\/ ](januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)",
+                combined
+            )
+            if mx:
+                params["date"] = f"{datetime.now().year}-{MONTH_MAP[mx.group(2)]:02d}-{int(mx.group(1)):02d}"
+
+        # Format 3: ISO "2026-05-18"
+        if "date" not in params:
+            mx = re.search(r"(\d{4}-\d{2}-\d{2})", combined)
+            if mx:
+                params["date"] = mx.group(1)
+
+        # Format 4: "18/05/2026"
+        if "date" not in params:
+            mx = re.search(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})", combined)
+            if mx:
+                params["date"] = f"{mx.group(3)}-{int(mx.group(2)):02d}-{int(mx.group(1)):02d}"
+
+        # Format 5: bare "tanggal 18"
+        if "date" not in params:
+            mx = re.search(r"tanggal\s*[=:]?\s*(\d{1,2})\b", combined)
+            if mx:
+                day = int(mx.group(1))
+                today = datetime.now().date()
+                from datetime import date as _date
+                try:
+                    candidate = _date(today.year, today.month, day)
+                    if candidate < today:
+                        nm = 1 if today.month == 12 else today.month + 1
+                        ny = today.year + 1 if today.month == 12 else today.year
+                        candidate = _date(ny, nm, day)
+                    params["date"] = candidate.isoformat()
+                except ValueError:
+                    pass
+
+        # ── TIME EXTRACTION ───────────────────────────────────────────────
+        # Handles: "jam 15:00", "jam= 15:00", "Jam=15:00", "pukul 15.00", "3 sore"
+        mx = re.search(
+            r"(?:jam|pukul)\s*[=:]?\s*(\d{1,2})(?:[.:](\d{2}))?\s*(sore|malam|pagi|siang)?",
+            combined
+        )
+        if mx:
+            hour = int(mx.group(1))
+            minute = (mx.group(2) or "00").strip()
+            period = mx.group(3) or ""
+            if period in ("sore", "malam") and hour < 12:
+                hour += 12
+            params["time"] = f"{hour:02d}:{minute.zfill(2)}"
+        else:
+            mx = re.search(r"\b(\d{2})[.:](\d{2})\b", combined)
+            if mx:
+                params["time"] = f"{mx.group(1)}:{mx.group(2).strip()}"
+
+        # ── CAR NAME EXTRACTION ───────────────────────────────────────────
+        # Strategy 1: after "mobil/kendaraan/unit" keyword (with optional = or :)
+        mx = re.search(
+            r"(?:mobil|kendaraan|unit)\s*[=:]?\s*(?:yang\s+\w+\s+)?([A-Z][A-Za-z0-9][A-Za-z0-9 \-]{1,38})",
+            all_user_msgs
+        )
+        if mx:
+            params["car_name"] = mx.group(1).strip().rstrip(",.")            
+
+        # Strategy 2: last comma-separated segment that looks like a proper car name
+        if "car_name" not in params:
+            NOISE = {"tanggal", "jam", "pukul", "jadwal", "temu", "meeting",
+                     "booking", "saya", "mau", "ingin", "buat", "halo", "aku",
+                     "kami", "dengan", "untuk", "yang", "dan", "ke", "di"}
+            segments = [s.strip() for s in re.split(r"[,;\n]", message)]
+            for seg in reversed(segments):
+                seg_clean = seg.strip().rstrip(".,")
+                words = seg_clean.split()
+                if (len(words) >= 2
+                        and seg_clean and seg_clean[0].isupper()
+                        and not any(w.lower() in NOISE for w in words)
+                        and not re.search(r"\d{4}|\d{2}[:.]\d{2}", seg_clean)):
+                    params["car_name"] = seg_clean
+                    break
+
+        return params
+
     async def get_response(self, message: str, user: User, session_id: Optional[str] = None) -> dict:
         # Auto-generate session_id if not provided
         if not session_id:
@@ -124,40 +263,61 @@ class AIChatService:
         # 1. Get History
         history_doc = await self._get_or_create_history(session_id, user.id)
         history_messages = history_doc.messages
+        
+        # Format history for NLU context (last 3 messages)
+        history_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history_messages[-3:]]) if history_messages else "Tidak ada"
 
-        # 2. STEP 1: NLU - Extract Intent and Entities
-        nlu_prompt = f"""Kamu adalah NLU Parser untuk Showroom Mobil. Tugasmu mengekstrak niat (intent) dan parameter dari pesan user.
+        # 2. STEP 1: Rule-based intent detection FIRST (bypass NLU model)
+        rule_params = self._rule_detect_booking(message, history_messages)
+        if rule_params is not None:
+            intent = "CREATE_BOOKING"
+            params = rule_params
+            print(f"[RULE-BASED] Detected CREATE_BOOKING: {params}")
+        else:
+            # Fall back to NLU model
+            nlu_prompt = f"""Kamu adalah NLU Parser untuk Showroom Mobil. Tugasmu mengekstrak niat (intent) dan parameter dari pesan user.
 Waktu sekarang: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 INTENT yang tersedia:
 - SEARCH_CAR: Mencari mobil (params: brand, min_price, max_price, transmission, type)
 - GET_SLOTS: Mencari jadwal kosong (params: location_id, date)
-- CREATE_BOOKING: Membuat janji temu/booking (params: car_id, slot_id, notes)
+- CREATE_BOOKING: Membuat janji temu/booking (params: date (format YYYY-MM-DD atau DD), time (format HH:MM), car_name, notes)
 - CANCEL_BOOKING: Membatalkan jadwal (params: schedule_id)
 - MY_BOOKINGS: Melihat daftar janji temu milik user saat ini
 - GENERAL: Tanya jawab umum
 
-Pesan User: "{message}"
+Konteks Percakapan Sebelumnya:
+{history_context}
+
+Pesan User Saat Ini: "{message}"
+
+PENTING: Gunakan 'Konteks Percakapan Sebelumnya' untuk menentukan apakah pesan saat ini adalah kelanjutan dari niat sebelumnya.
 
 OUTPUT HARUS JSON SAJA:
 {{"intent": "INTENT_NAME", "params": {{...}}}}"""
 
-        nlu_response = await self._call_ollama([{"role": "system", "content": nlu_prompt}])
-        
-        try:
-            json_match = re.search(r'\{.*\}', nlu_response, re.DOTALL)
-            nlu_data = json.loads(json_match.group(0)) if json_match else {"intent": "GENERAL", "params": {}}
-        except:
-            nlu_data = {"intent": "GENERAL", "params": {}}
+            nlu_response = await self._call_ollama([{"role": "system", "content": nlu_prompt}])
+            
+            try:
+                json_match = re.search(r'\{.*\}', nlu_response, re.DOTALL)
+                nlu_data = json.loads(json_match.group(0)) if json_match else {"intent": "GENERAL", "params": {}}
+            except:
+                nlu_data = {"intent": "GENERAL", "params": {}}
 
-        intent = nlu_data.get("intent", "GENERAL")
-        params = nlu_data.get("params", {})
+            intent = nlu_data.get("intent", "GENERAL")
+            params = nlu_data.get("params", {})
+
         response_style = self._detect_response_style(message)
 
         # 3. STEP 2: Execution & Context Gathering
         context = ""
         car_recommendations = []
-        rag_context, has_retrieval_data = await self._build_rag_context(message, user)
+        # Skip RAG context for booking intents to avoid car info contaminating the reply
+        if intent in ("CREATE_BOOKING", "CANCEL_BOOKING", "MY_BOOKINGS"):
+            rag_context, has_retrieval_data = "", False
+        else:
+            rag_context, has_retrieval_data = await self._build_rag_context(message, user)
+
 
         try:
             if intent == "SEARCH_CAR":
@@ -203,16 +363,98 @@ OUTPUT HARUS JSON SAJA:
                     context = "Anda belum memiliki jadwal janji temu."
 
             elif intent == "CREATE_BOOKING":
-                car_id = params.get("car_id")
-                slot_id = params.get("slot_id")
-                if car_id and slot_id:
-                    from app.schemas.schedule import ScheduleCreate
-                    new_booking = await schedule_service.create_schedule(user, ScheduleCreate(
-                        car_id=car_id, slot_id=slot_id, notes=params.get("notes", "Booking via AI")
-                    ))
-                    context = f"BERHASIL! Janji temu telah dibuat. ID Jadwal: {new_booking.id}. Status: {new_booking.status}."
+                date_str = params.get("date")
+                time_str = params.get("time")
+                car_name = params.get("car_name")
+                notes = params.get("notes")
+
+                if not date_str or not time_str or not car_name:
+                    context = (
+                        "pastikan sudah menentukan mobil yang akan dibawa owner saat booking dilakukan, untuk membuat jadwal bertemu silahkan isi data berikut:\n"
+                        "Tanggal = Tahun/bulan/tanggal,\n"
+                        "Jam = XX:XX,\n"
+                        "Mobil yang akan di bawa owner:....,\n"
+                    )
                 else:
-                    context = "Gagal membuat janji. Saya butuh car_id dan slot_id. Tolong berikan ID tersebut atau tanyakan stok mobil/slot jadwal dulu."
+                    from datetime import date
+                    today = datetime.now().date()
+                    slot_date = None
+                    if isinstance(date_str, str):
+                        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d %m %Y"):
+                            try:
+                                slot_date = datetime.strptime(date_str, fmt).date()
+                                break
+                            except ValueError:
+                                pass
+                        
+                        if not slot_date and date_str.isdigit() and 1 <= int(date_str) <= 31:
+                            target_day = int(date_str)
+                            try:
+                                slot_date = date(today.year, today.month, target_day)
+                                if slot_date < today:
+                                    month = 1 if today.month == 12 else today.month + 1
+                                    year = today.year + 1 if today.month == 12 else today.year
+                                    slot_date = date(year, month, target_day)
+                            except ValueError:
+                                pass
+
+                    if not slot_date:
+                        context = "Format tanggal tidak valid. Mohon berikan tanggal yang benar (contoh: 2026-05-18 atau 18)."
+                    else:
+                        from app.models.car import Car
+                        # Split car_name into tokens and build OR query for each token
+                        # e.g. "Nissan New Livina" → search brand/model for "Nissan" OR "Livina" etc.
+                        tokens = [t for t in car_name.split() if len(t) >= 3]
+                        if not tokens:
+                            tokens = [car_name]
+                        token_conditions = []
+                        for token in tokens:
+                            token_conditions.extend([
+                                {"brand": {"$regex": token, "$options": "i"}},
+                                {"model": {"$regex": token, "$options": "i"}}
+                            ])
+                        all_candidates = await Car.find({"$or": token_conditions}).to_list()
+
+                        # Score each candidate by how many tokens appear in brand+model
+                        def score_car(c):
+                            haystack = f"{c.brand} {c.model}".lower()
+                            return sum(1 for t in tokens if t.lower() in haystack)
+
+                        all_candidates.sort(key=score_car, reverse=True)
+                        cars = [c for c in all_candidates if score_car(c) > 0]
+
+                        if not cars:
+                            context = f"Maaf, mobil '{car_name}' tidak ditemukan di sistem kami."
+                        else:
+                            selected_car = cars[0]
+                            slots_for_date = await available_slot_service.get_available_slots(slot_date=slot_date)
+                            
+                            matched_slot = None
+                            time_prefix = str(time_str).replace(".", ":")[:5] if time_str else ""
+                            for slot in slots_for_date:
+                                if time_prefix and time_prefix in slot.time:
+                                    matched_slot = slot
+                                    break
+                            
+                            if matched_slot:
+                                from app.schemas.schedule import ScheduleCreate
+                                new_booking = await schedule_service.create_schedule(user, ScheduleCreate(
+                                    car_id=str(selected_car.id), 
+                                    slot_id=str(matched_slot.slot_id),
+                                    email=user.email,
+                                    phone=user.phone or "-",
+                                    notes=notes or f"Pertemuan untuk mobil: {car_name}"
+                                ))
+                                context = "BERHASIL! Janji temu telah dibuat, silahkan cek page appointment."
+                            else:
+                                if slots_for_date:
+                                    context = f"Maaf, jadwal di tanggal {slot_date} jam {time_str} tidak tersedia. Berikut available_slot yang tersedia di tanggal tersebut:\n" + "\n".join([f"- Jam {s.time}" for s in slots_for_date[:5]])
+                                else:
+                                    all_slots = await available_slot_service.get_available_slots()
+                                    if all_slots:
+                                        context = f"Maaf, jadwal di tanggal {slot_date} tidak tersedia. Berikut available_slot terdekat yang tersedia:\n" + "\n".join([f"- Tanggal {s.date} Jam {s.time}" for s in all_slots[:5]])
+                                    else:
+                                        context = "Maaf, saat ini tidak ada jadwal yang tersedia sama sekali."
 
             elif intent == "CANCEL_BOOKING":
                 schedule_id = params.get("schedule_id")
@@ -229,7 +471,14 @@ OUTPUT HARUS JSON SAJA:
             context = f"Terjadi kesalahan saat memproses permintaan: {str(e)}"
 
         # 4. STEP 3: Generate Final Response
-        system_prompt = f"""Kamu adalah Showroom AI, asisten virtual proaktif di Dealer Mobil Premium.
+        DIRECT_REPLY_INTENTS = {"CREATE_BOOKING", "CANCEL_BOOKING", "MY_BOOKINGS"}
+
+        if intent in DIRECT_REPLY_INTENTS and context:
+            # For booking-related intents, use the structured context directly as the reply.
+            # Do NOT call the AI model — it will hallucinate and override the correct message.
+            reply = context
+        else:
+            system_prompt = f"""Kamu adalah Showroom AI, asisten virtual proaktif di Dealer Mobil Premium.
 Nama Customer: {user.username}
 Role Customer: {user.role}
 
@@ -250,10 +499,10 @@ PANDUAN JAWABAN:
 
 GAYA JAWABAN: {response_style}"""
 
-        messages = [{"role": "system", "content": system_prompt}] + history_messages + [{"role": "user", "content": message}]
-        reply = await self._call_ollama(messages)
-        if not reply:
-            reply = "Maaf, saya sedang mengalami kendala teknis. Ada yang bisa saya bantu secara manual?"
+            messages = [{"role": "system", "content": system_prompt}] + history_messages + [{"role": "user", "content": message}]
+            reply = await self._call_ollama(messages)
+            if not reply:
+                reply = "Maaf, saya sedang mengalami kendala teknis. Ada yang bisa saya bantu secara manual?"
 
         if not car_recommendations and has_retrieval_data:
             relevant_cars = await self._retrieve_relevant_cars(message, limit=3)
