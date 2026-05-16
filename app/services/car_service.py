@@ -7,7 +7,8 @@ class CarService:
     async def get_all_cars(self, page: int, limit: int, **filters):
         skip = (page - 1) * limit
         cars, total = await car_repo.get_filtered_cars(skip=skip, limit=limit, **filters)
-        return cars, total
+        stats = await car_repo.get_car_stats()
+        return cars, total, stats
 
     async def get_car(self, car_id: str):
         try:

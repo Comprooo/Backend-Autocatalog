@@ -51,4 +51,14 @@ class CarRepository(BaseRepository[Car]):
             query["year"] = year
         return await self.model.find(query).count()
 
+    async def get_car_stats(self) -> dict:
+        total = await self.model.find_all().count()
+        tersedia = await self.model.find({"status": "Tersedia"}).count()
+        terjual = await self.model.find({"status": "Terjual"}).count()
+        return {
+            "total": total,
+            "tersedia": tersedia,
+            "terjual": terjual
+        }
+
 car_repo = CarRepository()

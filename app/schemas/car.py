@@ -41,6 +41,8 @@ class CarListResponse(BaseModel):
     price: float
     year: int
     transmission: str
+    mileage: str
+    fuel: str
     status: str
     condition: str
     thumbnail_url: str
@@ -54,10 +56,21 @@ class CarListResponse(BaseModel):
             price=c.price,
             year=c.year,
             transmission=c.transmission,
+            mileage=f"{c.mileage:,} km".replace(",", "."),
+            fuel=c.fuel,
             status=c.status,
             condition=c.condition,
             thumbnail_url=c.images[0] if c.images else ""
         )
+
+class CarStats(BaseModel):
+    total: int
+    tersedia: int
+    terjual: int
+
+class CarListWithStatsResponse(BaseModel):
+    statistics: CarStats
+    cars: List[CarListResponse]
 
 class CarResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
