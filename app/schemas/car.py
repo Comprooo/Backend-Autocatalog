@@ -46,6 +46,7 @@ class CarListResponse(BaseModel):
     status: str
     condition: str
     thumbnail_url: str
+    sold_at: Optional[datetime] = None
 
     @classmethod
     def from_model(cls, c: Any):
@@ -60,7 +61,8 @@ class CarListResponse(BaseModel):
             fuel=c.fuel,
             status=c.status,
             condition=c.condition,
-            thumbnail_url=c.images[0] if c.images else ""
+            thumbnail_url=c.images[0] if c.images else "",
+            sold_at=getattr(c, "sold_at", None)
         )
 
 class CarStats(BaseModel):
@@ -87,6 +89,7 @@ class CarResponse(BaseModel):
     thumbnail: str
     created_at: datetime
     updated_at: datetime
+    sold_at: Optional[datetime] = None
 
     @field_validator("car_id", mode="before")
     @classmethod
@@ -116,5 +119,6 @@ class CarResponse(BaseModel):
             description=c.description,
             thumbnail=c.images[0] if c.images else "",
             created_at=c.created_at,
-            updated_at=c.updated_at
+            updated_at=c.updated_at,
+            sold_at=getattr(c, "sold_at", None)
         )

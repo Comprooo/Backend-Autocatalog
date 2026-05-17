@@ -16,6 +16,7 @@ class Car(Document):
     car_type: str = "MPV" # e.g., MPV, SUV, Sedan
     description: str
     status: str = "Tersedia" # "Tersedia", "Terjual"
+    sold_at: Optional[datetime] = None
     features: List[str] = []
     images: List[str] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

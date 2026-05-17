@@ -67,6 +67,14 @@ class CarService:
                 except ValueError:
                     pass
         
+        if "status" in update_data:
+            new_status = update_data["status"]
+            if new_status == "Terjual" and car.status != "Terjual":
+                from datetime import datetime, timezone
+                car.sold_at = datetime.now(timezone.utc)
+            elif new_status == "Tersedia" and car.status != "Tersedia":
+                car.sold_at = None
+
         for field, value in update_data.items():
             setattr(car, field, value)
         
@@ -77,7 +85,14 @@ class CarService:
         car = await self.get_car(car_id)
         if status_in.status not in ["Tersedia", "Terjual"]:
             raise HTTPException(status_code=400, detail="Invalid status")
-        return await car_repo.update(car, status_in)
+        
+        if status_in.status == "Terjual" and car.status != "Terjual":
+            from datetime import datetime, timezone
+            car.sold_at = datetime.now(timezone.utc)
+        elif status_in.status == "Tersedia" and car.status != "Tersedia":
+            car.sold_at = None
+
+        return await car_repo.update(car, {"status": status_in.status, "sold_at": car.sold_at})
 
     async def delete_car(self, car_id: str):
         car = await self.get_car(car_id)

@@ -143,6 +143,17 @@ async def seed_cars() -> list[Car]:
             seeded.append(existing)
             continue
 
+        sold_at = None
+        if data.get("status") == "Terjual":
+            sold_at_str = data.get("sold_at")
+            if sold_at_str:
+                try:
+                    sold_at = datetime.fromisoformat(sold_at_str.replace("Z", "+00:00"))
+                except ValueError:
+                    sold_at = datetime.now(timezone.utc) - timedelta(days=5)
+            else:
+                sold_at = datetime.now(timezone.utc) - timedelta(days=5)
+
         car = Car(
             brand=data["brand"],
             model=data["type"],
@@ -155,7 +166,8 @@ async def seed_cars() -> list[Car]:
             description=data["description"],
             status=data["status"],
             features=data["features"],
-            images=data["images"]
+            images=data["images"],
+            sold_at=sold_at
         )
         await car.insert()
         seeded.append(car)

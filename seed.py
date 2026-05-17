@@ -1,6 +1,7 @@
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
 from beanie import init_beanie
+from datetime import datetime, timezone, timedelta
 from app.core.config import settings
 from app.models.user import User
 from app.models.car import Car
@@ -102,6 +103,7 @@ async def seed():
             color="Abu-abu",
             description="MPV ekonomis dan handal.",
             status="Terjual",
+            sold_at=datetime.now(timezone.utc) - timedelta(days=10),
             features=["AC", "Power Steering"],
             images=[gdrive_images[0]]
         ),
