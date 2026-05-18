@@ -99,6 +99,51 @@ class ScheduleService:
         total = await schedule_repo.model.find_all().count()
         return schedules, total
 
+    async def get_admin_schedules(self, page: int, limit: int):
+        skip = (page - 1) * limit
+        schedules = await schedule_repo.get_all(skip=skip, limit=limit)
+        
+        # Calculate summary for ALL users
+        total = await schedule_repo.model.find_all().count()
+        pending = await schedule_repo.model.find(schedule_repo.model.status == "pending").count()
+        confirmed = await schedule_repo.model.find(schedule_repo.model.status == "confirmed").count()
+        cancelled = await schedule_repo.model.find(schedule_repo.model.status == "cancelled").count()
+        completed = await schedule_repo.model.find(schedule_repo.model.status == "completed").count()
+        
+        from app.schemas.schedule import ScheduleDetailResponse, AppointmentSummary, MyAppointmentsResponse
+        from app.schemas.available_slot import AvailableSlotResponse
+        from app.models.location import Location
+        
+        detailed_appointments = []
+        for s in schedules:
+            from app.repositories.car_repo import car_repo
+            from app.schemas.car import CarResponse
+            car = await car_repo.get(s.car_id)
+            
+            from app.models.available_slot import AvailableSlot
+            slot_model = await AvailableSlot.get(s.slot_id)
+            location = await Location.get(slot_model.location_id) if slot_model else None
+            
+            s_data = s.model_dump()
+            s_data["id"] = str(s.id)
+            s_data["user_id"] = str(s.user_id)
+            s_data["car_id"] = str(s.car_id)
+            s_data["slot_id"] = str(s.slot_id)
+            s_data["car"] = CarResponse.from_model(car) if car else None
+            s_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
+            detailed_appointments.append(ScheduleDetailResponse(**s_data))
+
+        return MyAppointmentsResponse(
+            summary=AppointmentSummary(
+                total=total, 
+                pending=pending, 
+                confirmed=confirmed,
+                cancelled=cancelled,
+                completed=completed
+            ),
+            appointments=detailed_appointments
+        )
+
     async def get_schedule(self, schedule_id: str):
         if not PydanticObjectId.is_valid(schedule_id):
             raise HTTPException(status_code=400, detail="Invalid ID format")
