@@ -54,7 +54,19 @@ class AdminAvailableSlotResponse(AvailableSlotBase):
 
 class AvailableSlotUpdate(BaseModel):
     location_id: Optional[str] = None
-    date: Optional[date] = None
+    date: Optional[str] = None
     time_start: Optional[str] = None
     time_end: Optional[str] = None
     quota: Optional[int] = None
+
+    @field_validator("date")
+    @classmethod
+    def prevent_null_and_validate_date(cls, v: Any) -> Any:
+        if v is None:
+            raise ValueError("date cannot be null")
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("Invalid date format, must be YYYY-MM-DD")
+        return v
+

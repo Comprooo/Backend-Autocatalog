@@ -71,7 +71,11 @@ class AvailableSlotService:
             slot.location_id = PydanticObjectId(slot_in.location_id)
             
         if slot_in.date is not None:
-            slot.date = slot_in.date
+            from datetime import datetime
+            try:
+                slot.date = datetime.strptime(slot_in.date, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format, must be YYYY-MM-DD")
             
         if slot_in.time_start is not None:
             slot.time_start = slot_in.time_start
