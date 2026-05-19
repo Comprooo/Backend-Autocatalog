@@ -42,7 +42,7 @@ async def internal_inventory_search(
     status: str = None,
     authenticated: bool = Depends(verify_internal_token)
 ):
-    cars, _ = await car_service.get_all_cars(
+    cars, _, _ = await car_service.get_all_cars(
         page=1, limit=50, brand=brand, min_price=min_price, max_price=max_price, status=status
     )
     # Match the spec response

@@ -53,7 +53,7 @@ class AIChatService:
         if not query_tokens:
             return []
 
-        cars, _ = await car_service.get_all_cars(page=1, limit=100)
+        cars, _, _ = await car_service.get_all_cars(page=1, limit=100)
         scored = []
         for c in cars:
             searchable = " ".join([
@@ -329,7 +329,7 @@ OUTPUT HARUS JSON SAJA:
                     elif "jt" in max_price:
                         max_price = int(re.sub(r'[^0-9]', '', max_price)) * 1000000
 
-                cars, _ = await car_service.get_all_cars(
+                cars, _, _ = await car_service.get_all_cars(
                     page=1, limit=5, brand=brand, max_price=max_price,
                     transmission=params.get("transmission"), car_type=params.get("type")
                 )
@@ -356,7 +356,9 @@ OUTPUT HARUS JSON SAJA:
                 my_schedules = await schedule_service.get_my_schedules(user, page=1, limit=5)
                 if getattr(my_schedules, 'appointments', None):
                     context = "Jadwal Anda saat ini:\n" + "\n".join([
-                        f"- ID: {s.id} | Mobil: {s.car.brand} {s.car.model} | Status: {s.status} | Waktu: {s.slot.date if getattr(s, 'slot', None) else ''} {s.slot.time if getattr(s, 'slot', None) else ''}"
+                        f"- ID: {s.id} | Mobil: {s.car.brand} {s.car.model if s.car else 'Tidak ditemukan'} | Status: {s.status} | Waktu: {s.slot.date if getattr(s, 'slot', None) else ''} {s.slot.time if getattr(s, 'slot', None) else ''}"
+                        if s.car else
+                        f"- ID: {s.id} | Mobil: Tidak ditemukan | Status: {s.status} | Waktu: {s.slot.date if getattr(s, 'slot', None) else ''} {s.slot.time if getattr(s, 'slot', None) else ''}"
                         for s in my_schedules.appointments
                     ])
                 else:
