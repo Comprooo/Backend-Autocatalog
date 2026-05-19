@@ -78,8 +78,10 @@ class ScheduleService:
             s_data["user_id"] = str(s.user_id)
             s_data["car_id"] = str(s.car_id)
             s_data["slot_id"] = str(s.slot_id)
+            from app.schemas.user import UserResponse
             s_data["car"] = CarResponse.from_model(car) if car else None
             s_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
+            s_data["user"] = UserResponse.model_validate(user)
             detailed_appointments.append(ScheduleDetailResponse(**s_data))
 
         return MyAppointmentsResponse(
@@ -129,8 +131,12 @@ class ScheduleService:
             s_data["user_id"] = str(s.user_id)
             s_data["car_id"] = str(s.car_id)
             s_data["slot_id"] = str(s.slot_id)
+            from app.models.user import User as UserModel
+            from app.schemas.user import UserResponse
+            user_model = await UserModel.get(s.user_id)
             s_data["car"] = CarResponse.from_model(car) if car else None
             s_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
+            s_data["user"] = UserResponse.model_validate(user_model) if user_model else None
             detailed_appointments.append(ScheduleDetailResponse(**s_data))
 
         return MyAppointmentsResponse(

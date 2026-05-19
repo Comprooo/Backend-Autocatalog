@@ -34,8 +34,12 @@ async def get_schedule_detail(schedule_id: str = Path(...)):
     schedule_data["user_id"] = str(schedule.user_id)
     schedule_data["car_id"] = str(schedule.car_id)
     schedule_data["slot_id"] = str(schedule.slot_id)
+    from app.models.user import User as UserModel
+    from app.schemas.user import UserResponse
+    user_model = await UserModel.get(schedule.user_id)
     schedule_data["car"] = CarResponse.from_model(car) if car else None
     schedule_data["slot"] = AvailableSlotResponse.from_model(slot_model, location) if slot_model else None
+    schedule_data["user"] = UserResponse.model_validate(user_model) if user_model else None
     
     return ResponseModel(data=ScheduleDetailResponse(**schedule_data), message="Schedule detail retrieved")
 

@@ -51,3 +51,10 @@ class AdminAvailableSlotResponse(AvailableSlotBase):
         if v is None:
             return v
         return str(v)
+
+class AvailableSlotUpdate(BaseModel):
+    location_id: Optional[str] = None
+    date: Optional[date] = None
+    time_start: Optional[str] = None
+    time_end: Optional[str] = None
+    quota: Optional[int] = None

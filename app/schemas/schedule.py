@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict, field_validator, Field
 from typing import Optional, Any, List
 from datetime import datetime, date, time
 from app.schemas.car import CarResponse
+from app.schemas.user import UserResponse
 
 class ScheduleCreate(BaseModel):
     car_id: str
@@ -48,6 +49,7 @@ class ScheduleResponse(BaseModel):
 class ScheduleDetailResponse(ScheduleResponse):
     car: Optional[CarResponse] = None
     slot: Optional[Any] = None # Will be AvailableSlotResponse
+    user: Optional[UserResponse] = None
 
 class MyAppointmentsResponse(BaseModel):
     summary: AppointmentSummary
