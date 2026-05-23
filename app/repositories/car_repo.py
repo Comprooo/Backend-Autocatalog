@@ -1,6 +1,7 @@
 from app.repositories.base import BaseRepository
 from app.models.car import Car
 from typing import List, Tuple, Optional
+from datetime import datetime
 import re
 
 class CarRepository(BaseRepository[Car]):
@@ -45,10 +46,20 @@ class CarRepository(BaseRepository[Car]):
         
         return cars, total
 
-    async def count_by_status(self, status: str, year: Optional[int] = None) -> int:
+    async def count_by_status(
+        self,
+        status: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> int:
         query = {"status": status}
-        if year:
-            query["year"] = year
+        if start_date or end_date:
+            created_at_query = {}
+            if start_date:
+                created_at_query["$gte"] = start_date
+            if end_date:
+                created_at_query["$lt"] = end_date
+            query["created_at"] = created_at_query
         return await self.model.find(query).count()
 
     async def get_car_stats(self) -> dict:

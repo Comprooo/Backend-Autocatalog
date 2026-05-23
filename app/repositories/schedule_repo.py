@@ -2,6 +2,7 @@ from app.repositories.base import BaseRepository
 from app.models.schedule import Schedule
 from beanie import PydanticObjectId
 from typing import List, Tuple, Optional
+from datetime import datetime
 
 class ScheduleRepository(BaseRepository[Schedule]):
     def __init__(self):
@@ -19,13 +20,20 @@ class ScheduleRepository(BaseRepository[Schedule]):
         schedules = await query.skip(skip).limit(limit).to_list()
         return schedules, total
 
-    async def count_by_status(self, status: str, year: Optional[int] = None) -> int:
+    async def count_by_status(
+        self,
+        status: str,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None
+    ) -> int:
         query = {"status": status}
-        if year:
-            from datetime import datetime, timezone
-            start_date = datetime(year, 1, 1, tzinfo=timezone.utc)
-            end_date = datetime(year, 12, 31, 23, 59, 59, tzinfo=timezone.utc)
-            query["created_at"] = {"$gte": start_date, "$lte": end_date}
+        if start_date or end_date:
+            created_at_query = {}
+            if start_date:
+                created_at_query["$gte"] = start_date
+            if end_date:
+                created_at_query["$lt"] = end_date
+            query["created_at"] = created_at_query
             
         return await self.model.find(query).count()
 
