@@ -186,12 +186,14 @@
             color: rgba(255,255,255,0.9);
             border-bottom-left-radius: 4px;
         }
-        .msg-bot .cars-list {
+        .msg-bot .cars-list,
+        .msg-bot .slots-list {
             margin-top: 10px;
             padding-top: 10px;
             border-top: 1px solid rgba(255,255,255,0.1);
         }
-        .car-item {
+        .car-item,
+        .slot-item {
             padding: 8px 10px;
             margin: 4px 0;
             background: rgba(255,255,255,0.06);
@@ -200,6 +202,8 @@
         }
         .car-item .car-brand { font-weight: 600; }
         .car-item .car-price { color: #a78bfa; }
+        .slot-item .slot-time { font-weight: 600; color: #4ade80; }
+        .slot-item .slot-location { color: rgba(255,255,255,0.72); }
         .car-item .car-status { 
             font-size: 0.72rem;
             padding: 2px 6px;
@@ -409,7 +413,7 @@
 
                 const data = await res.json();
                 if (data.data) {
-                    addMessage(data.data.reply, 'bot', data.data.car_recommendations);
+                    addMessage(data.data.reply, 'bot', data.data.car_recommendations, data.data.available_slots);
                 } else {
                     addMessage('Maaf, terjadi kesalahan.', 'bot');
                 }
@@ -423,7 +427,7 @@
             input.focus();
         }
 
-        function addMessage(text, type, cars = []) {
+        function addMessage(text, type, cars = [], slots = []) {
             const messagesEl = document.getElementById('chatMessages');
             const msgEl = document.createElement('div');
             msgEl.className = `msg msg-${type}`;
@@ -436,10 +440,25 @@
                 html += '<div class="cars-list"><strong>📋 Rekomendasi:</strong>';
                 cars.forEach(car => {
                     const statusClass = car.status === 'Tersedia' ? 'status-tersedia' : 'status-terjual';
+                    const carType = car.specifications?.type || car.type || car.model || '';
                     html += `<div class="car-item">
-                        <span class="car-brand">${car.brand}</span> (${car.type})<br>
+                        <span class="car-brand">${car.brand}</span> (${carType})<br>
                         <span class="car-price">Rp ${Number(car.price).toLocaleString('id-ID')}</span>
                         <span class="car-status ${statusClass}">${car.status}</span>
+                    </div>`;
+                });
+                html += '</div>';
+            }
+
+            // Add available slots if any
+            if (slots && slots.length > 0) {
+                html += '<div class="slots-list"><strong>Jadwal tersedia:</strong>';
+                slots.forEach(slot => {
+                    const locationName = slot.location?.location_name || '';
+                    html += `<div class="slot-item">
+                        <span class="slot-time">${slot.time}</span><br>
+                        <span>${slot.date}</span>
+                        ${locationName ? `<span class="slot-location"> - ${locationName}</span>` : ''}
                     </div>`;
                 });
                 html += '</div>';

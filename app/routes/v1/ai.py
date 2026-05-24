@@ -19,6 +19,7 @@ class ChatData(BaseModel):
     session_id: str  # Return session_id to client
     reply: str
     car_recommendations: List[Dict[str, Any]] = []
+    available_slots: List[Dict[str, Any]] = []
 
 @chat_router.post("/chat", response_model=ResponseModel[ChatData])
 async def chat(request: ChatRequest, current_user: User = Depends(get_current_user)):
