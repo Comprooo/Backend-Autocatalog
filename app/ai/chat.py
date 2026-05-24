@@ -49,7 +49,15 @@ class AIChatService:
             return ""
 
     async def _retrieve_relevant_cars(self, query: str, limit: int = 4):
-        query_tokens = set(re.findall(r"\w+", query.lower()))
+        ignored_tokens = {
+            "saya", "mau", "ingin", "lihat", "cari", "carikan", "mobil",
+            "unit", "kendaraan", "yang", "ada", "tersedia", "available",
+            "dengan", "harga", "brand"
+        }
+        query_tokens = {
+            token for token in re.findall(r"\w+", query.lower())
+            if token not in ignored_tokens and len(token) >= 3
+        }
         if not query_tokens:
             return []
 
@@ -515,6 +523,7 @@ OUTPUT HARUS JSON SAJA:
         context = ""
         car_recommendations = []
         available_slots = []
+        allow_retrieval_recommendations = True
         # Skip RAG context for booking intents to avoid car info contaminating the reply
         if intent in ("CREATE_BOOKING", "CANCEL_BOOKING", "MY_BOOKINGS"):
             rag_context, has_retrieval_data = "", False
@@ -543,7 +552,11 @@ OUTPUT HARUS JSON SAJA:
                     for c in cars:
                         car_recommendations.append(CarResponse.from_model(c).model_dump())
                 else:
-                    context = "Tidak ada mobil ditemukan."
+                    allow_retrieval_recommendations = False
+                    if brand:
+                        context = f'Mohon maaf stok saat ini untuk brand "{brand}" belum ada'
+                    else:
+                        context = "Mohon maaf stok mobil sesuai permintaan Anda saat ini belum ada."
 
             elif intent == "GET_SLOTS":
                 slot_date = params.get("date")
@@ -715,7 +728,7 @@ OUTPUT HARUS JSON SAJA:
         except Exception as e:
             context = f"Terjadi kesalahan saat memproses permintaan: {str(e)}"
 
-        if not car_recommendations and has_retrieval_data:
+        if allow_retrieval_recommendations and not car_recommendations and has_retrieval_data:
             relevant_cars = await self._retrieve_relevant_cars(message, limit=3)
             from app.schemas.car import CarResponse
             for c in relevant_cars:
@@ -733,8 +746,8 @@ OUTPUT HARUS JSON SAJA:
             # For booking-related intents, use the structured context directly as the reply.
             # Do NOT call the AI model — it will hallucinate and override the correct message.
             reply = context
-        elif intent == "SEARCH_CAR" and car_recommendations:
-            reply = self._build_data_reply(context, car_recommendations, response_style, has_retrieval_data)
+        elif intent == "SEARCH_CAR":
+            reply = self._build_data_reply(context, car_recommendations, response_style, has_retrieval_data) if car_recommendations else context
         else:
             system_prompt = f"""Kamu adalah Showroom AI, asisten virtual proaktif di Dealer Mobil Premium.
 Nama Customer: {user.username}
