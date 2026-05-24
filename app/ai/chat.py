@@ -351,7 +351,13 @@ class AIChatService:
         if mx:
             params["date"] = f"{mx.group(1)}-{MONTH_MAP[mx.group(2)]:02d}-{int(mx.group(3)):02d}"
 
-        # Format 2: "18 mei" or "tanggal 18 mei"
+        # Format 2: "2026/6/1" or "2026-6-1" (year/month/day)
+        if "date" not in params:
+            mx = re.search(r"(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", combined)
+            if mx:
+                params["date"] = f"{mx.group(1)}-{int(mx.group(2)):02d}-{int(mx.group(3)):02d}"
+
+        # Format 3: "18 mei" or "tanggal 18 mei"
         if "date" not in params:
             mx = re.search(
                 r"(?:tanggal\s*[=:]?\s*)?(\d{1,2})[\/ ](januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)",
@@ -360,19 +366,19 @@ class AIChatService:
             if mx:
                 params["date"] = f"{datetime.now().year}-{MONTH_MAP[mx.group(2)]:02d}-{int(mx.group(1)):02d}"
 
-        # Format 3: ISO "2026-05-18"
+        # Format 4: ISO "2026-05-18"
         if "date" not in params:
             mx = re.search(r"(\d{4}-\d{2}-\d{2})", combined)
             if mx:
                 params["date"] = mx.group(1)
 
-        # Format 4: "18/05/2026"
+        # Format 5: "18/05/2026"
         if "date" not in params:
             mx = re.search(r"(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})", combined)
             if mx:
                 params["date"] = f"{mx.group(3)}-{int(mx.group(2)):02d}-{int(mx.group(1)):02d}"
 
-        # Format 5: bare "tanggal 18"
+        # Format 6: bare "tanggal 18"
         if "date" not in params:
             mx = re.search(r"tanggal\s*[=:]?\s*(\d{1,2})\b", combined)
             if mx:
@@ -411,7 +417,7 @@ class AIChatService:
         # Strategy 1: after "mobil/kendaraan/unit" keyword, including longer labels
         # like "Mobil yang akan di bawa owner: toyota agya".
         mx = re.search(
-            r"(?:mobil|kendaraan|unit)(?:\s+yang\s+akan\s+di\s+bawa\s+owner|\s+yang\s+dibawa\s+owner|\s+owner)?\s*[=:]?\s*([A-Za-z0-9][A-Za-z0-9 \-]{1,38})",
+            r"(?:mobil|kendaraan|unit)(?:\s+yang\s+akan\s+di\s+bawa\s+owner|\s+yang\s+dibawa\s+owner|\s+owner)?\s*[=:]\s*([^,;\n]+)",
             all_user_msgs,
             re.IGNORECASE
         )
@@ -586,7 +592,7 @@ OUTPUT HARUS JSON SAJA:
                     today = datetime.now().date()
                     slot_date = None
                     if isinstance(date_str, str):
-                        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d %m %Y"):
+                        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d/%m/%Y", "%d-%m-%Y", "%d %m %Y"):
                             try:
                                 slot_date = datetime.strptime(date_str, fmt).date()
                                 break
@@ -632,10 +638,14 @@ OUTPUT HARUS JSON SAJA:
                         if not cars:
                             context = f"Maaf, mobil '{car_name}' tidak ditemukan di sistem kami."
                         else:
-                            normalized_input = re.sub(r"\s+", " ", car_name.lower()).strip()
+                            def normalize_car_text(value: str) -> str:
+                                value = re.sub(r"[^a-z0-9]+", " ", value.lower())
+                                return re.sub(r"\s+", " ", value).strip()
+
+                            normalized_input = normalize_car_text(car_name)
                             exact_cars = [
                                 c for c in cars
-                                if re.sub(r"\s+", " ", f"{c.brand} {c.model}".lower()).strip() == normalized_input
+                                if normalize_car_text(f"{c.brand} {c.model}") == normalized_input
                             ]
 
                             if not exact_cars:
