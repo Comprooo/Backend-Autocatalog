@@ -2,7 +2,7 @@ import httpx
 import json
 import re
 import uuid
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from typing import List, Dict, Any, Optional
 
 from app.services.car_service import car_service
@@ -242,13 +242,18 @@ class AIChatService:
 
     def _rule_detect_slots(self, message: str) -> dict | None:
         text = message.lower()
-        if not re.search(r"\b(slot|jadwal kosong|available slot|jadwal tersedia|jam kosong|waktu kosong)\b", text):
+        if not re.search(
+            r"\b(slot|available slot|jadwal kosong|jadwal tersedia|jadwal available|jadwal yang available|jam kosong|waktu kosong|jadwal booking(?:\s+admin)?|jadwal kosong admin|jadwal available admin)\b",
+            text
+        ):
             return None
 
         params: Dict[str, Any] = {}
         parsed_date = self._parse_date_from_text(message)
         if parsed_date:
             params["date"] = parsed_date
+        else:
+            params["range_days"] = 7
         return params
 
     async def _build_rag_context(self, message: str, user: User) -> tuple[str, bool]:
@@ -466,17 +471,17 @@ class AIChatService:
         history_context = "\n".join([f"{msg['role']}: {msg['content']}" for msg in history_messages[-3:]]) if history_messages else "Tidak ada"
 
         # 2. STEP 1: Rule-based intent detection FIRST (bypass NLU model)
-        rule_params = self._rule_detect_booking(message, history_messages)
-        if rule_params is not None:
-            intent = "CREATE_BOOKING"
-            params = rule_params
-            print(f"[RULE-BASED] Detected CREATE_BOOKING: {params}")
+        slot_params = self._rule_detect_slots(message)
+        if slot_params is not None:
+            intent = "GET_SLOTS"
+            params = slot_params
+            print(f"[RULE-BASED] Detected GET_SLOTS: {params}")
         else:
-            slot_params = self._rule_detect_slots(message)
-            if slot_params is not None:
-                intent = "GET_SLOTS"
-                params = slot_params
-                print(f"[RULE-BASED] Detected GET_SLOTS: {params}")
+            rule_params = self._rule_detect_booking(message, history_messages)
+            if rule_params is not None:
+                intent = "CREATE_BOOKING"
+                params = rule_params
+                print(f"[RULE-BASED] Detected CREATE_BOOKING: {params}")
             else:
                 search_params = self._rule_detect_car_search(message)
                 if search_params is not None:
@@ -566,12 +571,27 @@ OUTPUT HARUS JSON SAJA:
                     location_id=params.get("location_id"),
                     slot_date=slot_date
                 )
+                if params.get("range_days") and not slot_date:
+                    today = datetime.now().date()
+                    end_date = today + timedelta(days=int(params["range_days"]))
+                    slots = [s for s in slots if today <= s.date <= end_date]
+
                 if slots:
-                    available_slots = [s.model_dump(mode="json") for s in slots[:5]]
-                    context = "Slot tersedia:\n" + "\n".join([f"- ID: {s.slot_id} | {s.location.location_name if s.location else ''} | {s.date} {s.time}" for s in slots[:5]])
+                    available_slots = [s.model_dump(mode="json") for s in slots]
+                    if params.get("range_days") and not slot_date:
+                        context = "berikut adalah jadwal kosong admin untuk seminggu kedepan"
+                    else:
+                        context = "Slot tersedia:\n" + "\n".join([f"- ID: {s.slot_id} | {s.location.location_name if s.location else ''} | {s.date} {s.time}" for s in slots[:5]])
                 else:
-                    if slot_date:
-                        context = "Maaf pada tanggal tersebut admin tidak memiliki jadwal kosong untuk bertemu."
+                    if params.get("range_days") and not slot_date:
+                        context = "Maaf saat ini belum ada jadwal kosong admin untuk seminggu kedepan."
+                    elif slot_date:
+                        fallback_slots = await available_slot_service.get_available_slots()
+                        today = datetime.now().date()
+                        end_date = today + timedelta(weeks=7)
+                        fallback_slots = [s for s in fallback_slots if today <= s.date <= end_date]
+                        available_slots = [s.model_dump(mode="json") for s in fallback_slots]
+                        context = "Maaf pada tanggal tersebut admin tidak memiliki jadwal kosong untuk bertemu, berikut jadwal kosong admin selama 7 minggu kedepan."
                     else:
                         context = "Tidak ada slot jadwal tersedia saat ini."
 
@@ -712,7 +732,12 @@ OUTPUT HARUS JSON SAJA:
                                         available_slots = [s.model_dump(mode="json") for s in slots_for_date[:5]]
                                         context = f"Maaf, jadwal di tanggal {slot_date} jam {time_str} tidak tersedia. Berikut available_slot yang tersedia di tanggal tersebut:\n" + "\n".join([f"- Jam {s.time}" for s in slots_for_date[:5]])
                                     else:
-                                        context = "Maaf pada tanggal tersebut admin tidak memiliki jadwal kosong untuk bertemu."
+                                        fallback_slots = await available_slot_service.get_available_slots()
+                                        today = datetime.now().date()
+                                        end_date = today + timedelta(weeks=7)
+                                        fallback_slots = [s for s in fallback_slots if today <= s.date <= end_date]
+                                        available_slots = [s.model_dump(mode="json") for s in fallback_slots]
+                                        context = "Maaf pada tanggal tersebut admin tidak memiliki jadwal kosong untuk bertemu, berikut jadwal kosong admin selama 7 minggu kedepan."
 
             elif intent == "CANCEL_BOOKING":
                 schedule_id = params.get("schedule_id")
