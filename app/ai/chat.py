@@ -53,7 +53,7 @@ class AIChatService:
         if not query_tokens:
             return []
 
-        cars, _, _ = await car_service.get_all_cars(page=1, limit=100)
+        cars, _, _ = await car_service.get_all_cars(page=1, limit=100, status="Tersedia")
         scored = []
         for c in cars:
             searchable = " ".join([
@@ -533,7 +533,7 @@ OUTPUT HARUS JSON SAJA:
                         max_price = int(re.sub(r'[^0-9]', '', max_price)) * 1000000
 
                 cars, _, _ = await car_service.get_all_cars(
-                    page=1, limit=5, brand=brand, max_price=max_price,
+                    page=1, limit=5, brand=brand, max_price=max_price, status="Tersedia",
                     transmission=params.get("transmission"), car_type=params.get("type")
                 )
                 
@@ -625,7 +625,10 @@ OUTPUT HARUS JSON SAJA:
                                 {"brand": {"$regex": token, "$options": "i"}},
                                 {"model": {"$regex": token, "$options": "i"}}
                             ])
-                        all_candidates = await Car.find({"$or": token_conditions}).to_list()
+                        all_candidates = await Car.find({
+                            "$or": token_conditions,
+                            "status": "Tersedia"
+                        }).to_list()
 
                         # Score each candidate by how many tokens appear in brand+model
                         def score_car(c):
@@ -662,7 +665,8 @@ OUTPUT HARUS JSON SAJA:
                                     recommendation_source, _, _ = await car_service.get_all_cars(
                                         page=1,
                                         limit=5,
-                                        brand=detected_brand
+                                        brand=detected_brand,
+                                        status="Tersedia"
                                     )
                                 car_recommendations = [
                                     CarResponse.from_model(c).model_dump()
@@ -716,6 +720,11 @@ OUTPUT HARUS JSON SAJA:
             from app.schemas.car import CarResponse
             for c in relevant_cars:
                 car_recommendations.append(CarResponse.from_model(c).model_dump())
+
+        car_recommendations = [
+            car for car in car_recommendations
+            if car.get("status") == "Tersedia"
+        ]
 
         # 4. STEP 3: Generate Final Response
         DIRECT_REPLY_INTENTS = {"CREATE_BOOKING", "CANCEL_BOOKING", "MY_BOOKINGS", "GET_SLOTS"}
