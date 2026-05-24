@@ -320,12 +320,20 @@ class AIChatService:
         # Check if current message has a direct booking signal
         msg_lower = message.lower()
         msg_has_signal = any(re.search(p, msg_lower) for p in BOOKING_SIGNALS)
+        msg_has_booking_details = any(re.search(p, msg_lower) for p in [
+            r"\btanggal\s*[=:]?\s*\d{1,2}",
+            r"\b\d{1,2}\s+(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)(?:\s+\d{4})?\b",
+            r"\b\d{4}[\/-](?:\d{1,2}|januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember)[\/-]\d{1,2}\b",
+            r"\b(jam|pukul)\s*[=:]?\s*\d{1,2}(?:[.:]\d{2})?\b",
+            r"\b\d{1,2}[.:]\d{2}\b",
+            r"\b(mobil|kendaraan|unit)\b\s*(?:yang\s+akan\s+di\s+bawa\s+owner|yang\s+dibawa\s+owner|owner)?\s*[=:]",
+        ])
 
         # Check if recent history (last 4 msgs) has booking context
         recent_texts = " ".join([m.get("content", "") for m in history[-4:]]).lower()
         history_has_signal = any(re.search(p, recent_texts) for p in HISTORY_BOOKING_SIGNALS)
 
-        if not (msg_has_signal or history_has_signal):
+        if not (msg_has_signal or (history_has_signal and msg_has_booking_details)):
             return None  # No booking signal → fall through to NLU
 
         # Booking confirmed. Extract params from all user messages combined.
