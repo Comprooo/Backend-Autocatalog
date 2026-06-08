@@ -53,8 +53,18 @@ app.include_router(ai.ai_router, prefix="/api/v1")
 app.include_router(locations.router, prefix="/api/v1")
 app.include_router(locations.admin_router, prefix="/api/v1")
 
-# Mount uploads directory to serve static files
-app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+# Mount uploads directory to serve static files safely
+if os.path.exists(settings.UPLOAD_DIR):
+    app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+else:
+    try:
+        os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
+    except Exception:
+        import tempfile
+        temp_uploads = os.path.join(tempfile.gettempdir(), "uploads")
+        os.makedirs(temp_uploads, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=temp_uploads), name="uploads")
 
 @app.get("/health", tags=["health"])
 async def health_check():
