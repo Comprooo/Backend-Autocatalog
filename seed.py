@@ -9,8 +9,8 @@ from app.models.schedule import Schedule
 from app.core.security import get_password_hash
 
 async def seed():
-    # Gunakan localhost untuk koneksi dari script luar docker
-    client = AsyncIOMotorClient("mongodb://localhost:27017")
+    # Gunakan MONGODB_URL dari settings
+    client = AsyncIOMotorClient(settings.MONGODB_URL)
     database = client[settings.MONGODB_DB_NAME]
     
     await init_beanie(

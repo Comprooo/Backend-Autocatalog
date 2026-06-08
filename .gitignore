@@ -30,7 +30,8 @@ ENV/
 .env
 
 # Project specific uploads (Don't commit images)
-uploads/
+uploads/*
+!uploads/.gitkeep
 
 # IDE settings
 .vscode/
